@@ -1,0 +1,22 @@
+# Godot 4 generated files
+.godot/
+
+# Android export
+/android/
+
+# Exported binaries
+*.exe
+*.x86_64
+*.arm64
+*.universal
+*.apk
+*.aab
+*.ipa
+*.pck
+*.zip
+
+# Import cache
+*.import
+
+# macOS
+.DS_Store

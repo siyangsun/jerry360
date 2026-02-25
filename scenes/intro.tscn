@@ -1,0 +1,39 @@
+[gd_scene load_steps=2 format=3 uid="uid://c3tiqqn630co4"]
+
+[ext_resource type="Script" path="res://scripts/intro.gd" id="1_intro"]
+
+[node name="Intro" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_intro")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04, 0.04, 0.09, 1)
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 0
+anchor_left = 0.1
+anchor_top = 0.15
+anchor_right = 0.9
+anchor_bottom = 0.85
+theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="SkipLabel" type="Label" parent="."]
+layout_mode = 0
+anchor_top = 0.9
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1)
+theme_override_font_sizes/font_size = 14
+text = "press any key to skip"
+horizontal_alignment = 1
+vertical_alignment = 1
