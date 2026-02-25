@@ -19,6 +19,7 @@ config/run/main_scene="res://scenes/main.tscn"
 
 GameManager="*res://scripts/autoloads/game_manager.gd"
 ScoreManager="*res://scripts/autoloads/score_manager.gd"
+MusicManager="*res://scripts/autoloads/music_manager.gd"
 
 [input]
 
