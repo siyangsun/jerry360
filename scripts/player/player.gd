@@ -40,6 +40,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _handle_lateral(delta: float) -> void:
+	if not is_on_floor():
+		return
 	var input := Input.get_axis("move_left", "move_right")
 	if input != 0.0:
 		if velocity.x * input < 0.0:
