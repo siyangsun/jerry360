@@ -18,9 +18,15 @@ const RAMP_ANGLE := 0.175   # deg_to_rad(10) — shallow enough to ride onto wit
 const RAMP_LENGTH := 7.0
 const RAMP_WIDTH := 5.0
 const RAMP_THICKNESS := 0.1
-const RAMP_SPAWN_CHANCE := 0.75  # chance per slot
+const RAMP_SPAWN_CHANCE := 0.75  # chance per slot (after rail roll)
 const RAMP_SLOT_SPACING := 44.0  # meters between spawn slots
 const RAMP_MARGIN := 15.0        # clear space at each chunk end
+
+# Rails
+const RAIL_SPAWN_CHANCE := 0.4   # checked first — rails are rarer than ramps
+const RAIL_WIDTH_VISUAL := 0.9
+const RAIL_WIDTH_COLLISION := 1.4  # wider than visual so Jerry stays on
+const RAIL_HEIGHT := 0.35
 
 @export var chunk_scenes: Array[PackedScene] = []
 @export var player: CharacterBody3D
@@ -101,14 +107,20 @@ func _make_fallback_chunk() -> Node3D:
 		wall_size
 	))
 
-	_maybe_add_ramps(root)
+	_maybe_add_obstacles(root)
 	return root
 
 
-func _maybe_add_ramps(root: Node3D) -> void:
+func _maybe_add_obstacles(root: Node3D) -> void:
 	var z := -RAMP_MARGIN
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
-		if randf() < RAMP_SPAWN_CHANCE:
+		var roll := randf()
+		if roll < RAIL_SPAWN_CHANCE:
+			var length := randf_range(RAMP_LENGTH, RAMP_LENGTH * 3.0)
+			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
+			var rx := randf_range(-max_offset, max_offset)
+			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
+		elif roll < RAIL_SPAWN_CHANCE + RAMP_SPAWN_CHANCE:
 			var max_offset := FLOOR_WIDTH * 0.5 - RAMP_WIDTH * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_ramp(Vector3(rx, 0.0, z)))
@@ -146,6 +158,34 @@ func _make_ramp(origin: Vector3) -> StaticBody3D:
 	mesh_inst.position.y = RAMP_THICKNESS * 0.5 * cos(RAMP_ANGLE) + l * 0.5 * sin(RAMP_ANGLE)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.82, 0.91, 1.0)
+	mesh_inst.material_override = mat
+	body.add_child(mesh_inst)
+
+	return body
+
+
+func _make_rail(origin: Vector3, length: float) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.position = origin  # center of the rail
+
+	# Wide collision so Jerry doesn't slide off sideways
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(RAIL_WIDTH_COLLISION, RAIL_HEIGHT, length)
+	col.shape = shape
+	col.position.y = RAIL_HEIGHT * 0.5
+	body.add_child(col)
+
+	# Thin visual rail on top
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(RAIL_WIDTH_VISUAL, RAIL_HEIGHT, length)
+	mesh_inst.mesh = box
+	mesh_inst.position.y = RAIL_HEIGHT * 0.5
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.72, 0.72, 0.78)
+	mat.metallic = 0.85
+	mat.roughness = 0.15
 	mesh_inst.material_override = mat
 	body.add_child(mesh_inst)
 
