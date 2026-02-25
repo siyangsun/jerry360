@@ -6,6 +6,7 @@ extends CharacterBody3D
 @export var max_lateral_speed := 13.0
 @export var jump_velocity := 10.0
 @export var gravity := 24.0
+@export var wall_gravity := 18.0
 
 var _is_dead: bool = false
 
@@ -27,6 +28,8 @@ func _physics_process(delta: float) -> void:
 
 	velocity.z = -GameManager.current_speed
 	move_and_slide()
+
+	_apply_wall_gravity(delta)
 
 	if position.y < -50.0:
 		_fall_off()
@@ -63,6 +66,15 @@ func _handle_jump() -> void:
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= gravity * delta
+
+
+func _apply_wall_gravity(delta: float) -> void:
+	if not is_on_floor():
+		return
+	# If the floor normal tilts sideways, we're on a side panel not the flat base
+	if abs(get_floor_normal().x) > 0.2:
+		# Accelerate toward center based on displacement, not velocity
+		velocity.x -= sign(position.x) * wall_gravity * delta
 
 
 func _fall_off() -> void:

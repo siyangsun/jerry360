@@ -6,7 +6,12 @@ extends Node3D
 const CHUNK_LENGTH := 80.0
 const CHUNKS_AHEAD := 4
 const CHUNKS_BEHIND := 1
-const LANE_WIDTH := 2.5
+
+# Concave pipe cross-section
+const FLOOR_WIDTH := 14.0   # wide flat base
+const WALL_WIDTH := 4.5     # each angled side panel
+const WALL_ANGLE := 0.6981  # deg_to_rad(40) — slope of side panels from horizontal
+const PANEL_THICKNESS := 0.5
 
 @export var chunk_scenes: Array[PackedScene] = []
 @export var player: CharacterBody3D
@@ -27,11 +32,9 @@ func _process(_delta: float) -> void:
 	if GameManager.state != GameManager.State.PLAYING or not is_instance_valid(player):
 		return
 
-	# Spawn chunks ahead
 	while _spawn_z > player.position.z - CHUNKS_AHEAD * CHUNK_LENGTH:
 		_spawn_chunk()
 
-	# Despawn chunks behind
 	var despawn_z := player.position.z + CHUNKS_BEHIND * CHUNK_LENGTH
 	for chunk in _active_chunks.duplicate():
 		if chunk.position.z > despawn_z:
@@ -53,28 +56,60 @@ func _spawn_chunk() -> void:
 
 
 func _make_fallback_chunk() -> Node3D:
-	# Plain flat platform used until real chunk scenes are built.
-	# Body is offset so the chunk extends from z=0 to z=-CHUNK_LENGTH.
 	var root := Node3D.new()
 	root.name = "FallbackChunk"
 
+	var center_z := -CHUNK_LENGTH * 0.5
+
+	# Floor — wide and flat
+	var floor_size := Vector3(FLOOR_WIDTH, PANEL_THICKNESS, CHUNK_LENGTH)
+	root.add_child(_make_panel(
+		Vector3(0.0, -PANEL_THICKNESS * 0.5, center_z),
+		0.0,
+		floor_size
+	))
+
+	# Side wall geometry: position the panel center so its inner edge
+	# meets the floor edge at (±FLOOR_WIDTH/2, 0).
+	var wall_cx: float = FLOOR_WIDTH * 0.5 + WALL_WIDTH * 0.5 * cos(WALL_ANGLE)
+	var wall_cy: float = WALL_WIDTH * 0.5 * sin(WALL_ANGLE)
+	var wall_size := Vector3(WALL_WIDTH, PANEL_THICKNESS, CHUNK_LENGTH)
+
+	# Left wall — rotated inward (negative Z rotation tilts right edge down to meet floor)
+	root.add_child(_make_panel(
+		Vector3(-wall_cx, wall_cy, center_z),
+		-WALL_ANGLE,
+		wall_size
+	))
+
+	# Right wall — mirrored
+	root.add_child(_make_panel(
+		Vector3(wall_cx, wall_cy, center_z),
+		WALL_ANGLE,
+		wall_size
+	))
+
+	return root
+
+
+func _make_panel(pos: Vector3, rot_z: float, size: Vector3) -> StaticBody3D:
 	var body := StaticBody3D.new()
+	body.position = pos
+	body.rotation.z = rot_z
+
 	var mesh_inst := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3((LANE_WIDTH * 3.0 + 2.0) * 2.0, 0.4, CHUNK_LENGTH)
+	box.size = size
 	mesh_inst.mesh = box
+	body.add_child(mesh_inst)
 
 	var col := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = box.size
+	shape.size = size
 	col.shape = shape
-
-	body.add_child(mesh_inst)
 	body.add_child(col)
-	# Center of the box sits half a chunk length ahead (in -Z)
-	body.position = Vector3(0.0, -0.2, -CHUNK_LENGTH * 0.5)
-	root.add_child(body)
-	return root
+
+	return body
 
 
 func _on_state_changed(new_state: GameManager.State) -> void:
