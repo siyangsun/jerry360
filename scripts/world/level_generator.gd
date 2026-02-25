@@ -3,7 +3,7 @@ extends Node3D
 # Chunk-based infinite level generation.
 # Chunks spawn ahead of the player and are recycled behind.
 
-const CHUNK_LENGTH := 80.0
+const CHUNK_LENGTH := 240.0
 const CHUNKS_AHEAD := 4
 const CHUNKS_BEHIND := 1
 
@@ -29,6 +29,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("player") as CharacterBody3D
 	if GameManager.state != GameManager.State.PLAYING or not is_instance_valid(player):
 		return
 

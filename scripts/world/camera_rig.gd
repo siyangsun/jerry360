@@ -14,6 +14,8 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("player") as CharacterBody3D
+	if not is_instance_valid(player):
 		return
 
 	var target_pos := player.global_position + offset
