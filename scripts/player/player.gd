@@ -126,7 +126,7 @@ func _fall_off() -> void:
 		return
 	_is_dead = true
 	velocity = Vector3.ZERO
-	GameManager.return_to_menu()
+	GameManager.player_died()
 
 
 func die() -> void:

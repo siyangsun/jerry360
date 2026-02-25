@@ -5,6 +5,7 @@
 - better movement
     - jumping should be held down and released (kinda like my springboy game but to a lesser extent)
     - flips using arrow keys; but if you don't turn all the way by the time you land you'll wipe out (lose points, lose speed, have to get up)
+- turns in the course that turn the camera / orientation too
 
 ### cool aesthetic things to add soon
 - character model

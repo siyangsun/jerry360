@@ -35,7 +35,7 @@ That was three weeks ago. Jerry has not stopped."
 horizontal_alignment = 1
 vertical_alignment = 0
 autowrap_mode = 3
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 14
 
 [node name="TitleLabel" type="Label" parent="MenuScreen"]
 anchor_left = 0.0
@@ -45,7 +45,7 @@ anchor_bottom = 0.68
 text = "JERRY360"
 horizontal_alignment = 1
 vertical_alignment = 1
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 46
 theme_override_fonts/font = SubResource("Font_bold")
 theme_override_colors/font_color = Color(1.0, 0.82, 0.1, 1)
 theme_override_colors/font_outline_color = Color(1.0, 0.97, 0.55, 1)
@@ -66,30 +66,40 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 visible = false
 
-[node name="VBox" type="VBoxContainer" parent="DeathScreen"]
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -120.0
-offset_top = -100.0
-offset_right = 120.0
-offset_bottom = 100.0
-
-[node name="FinalDistanceLabel" type="Label" parent="DeathScreen/VBox"]
-text = "Distance: 0 m"
+[node name="DeathLabel" type="Label" parent="DeathScreen"]
+anchor_left = 0.05
+anchor_top = 0.04
+anchor_right = 0.95
+anchor_bottom = 0.38
+text = ""
 horizontal_alignment = 1
+vertical_alignment = 0
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 14
 
-[node name="HighScoreLabel" type="Label" parent="DeathScreen/VBox"]
-text = "Best: 0 m"
+[node name="TitleLabel" type="Label" parent="DeathScreen"]
+anchor_left = 0.0
+anchor_top = 0.38
+anchor_right = 1.0
+anchor_bottom = 0.68
+text = "JERRY360"
 horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 46
+theme_override_fonts/font = SubResource("Font_bold")
+theme_override_colors/font_color = Color(1.0, 0.82, 0.1, 1)
+theme_override_colors/font_outline_color = Color(1.0, 0.97, 0.55, 1)
+theme_override_constants/outline_size = 2
+theme_override_colors/font_shadow_color = Color(0.35, 0.2, 0.0, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
 
-[node name="RestartButton" type="Button" parent="DeathScreen/VBox"]
-text = "Restart"
-
-[node name="MenuButton" type="Button" parent="DeathScreen/VBox"]
-text = "Menu"
+[node name="TryAgainButton" type="Button" parent="DeathScreen"]
+anchor_left = 0.38
+anchor_top = 0.70
+anchor_right = 0.62
+anchor_bottom = 0.78
+text = "Try Again?"
 
 [connection signal="pressed" from="MenuScreen/StartButton" to="." method="_on_start_pressed"]
-[connection signal="pressed" from="DeathScreen/VBox/RestartButton" to="." method="_on_restart_pressed"]
-[connection signal="pressed" from="DeathScreen/VBox/MenuButton" to="." method="_on_menu_pressed"]
+[connection signal="pressed" from="DeathScreen/TryAgainButton" to="." method="_on_try_again_pressed"]
