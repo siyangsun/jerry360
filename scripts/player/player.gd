@@ -18,6 +18,7 @@ var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
 var _boost_multiplier: float = 1.0
 var _boost_timer: float = 0.0
+var _smooth_vel_x: float = 0.0
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 
@@ -47,11 +48,14 @@ func _physics_process(delta: float) -> void:
 		_fall_off()
 		return
 
+	# Smooth velocity for visuals — filters out rapid physics jitter
+	_smooth_vel_x = lerpf(_smooth_vel_x, velocity.x, 10.0 * delta)
+
 	# Visual tilt and yaw — velocity-based on ground, spin-based in air
 	if is_instance_valid(mesh_pivot):
-		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, -velocity.x * 0.02, 10.0 * delta)
+		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, -_smooth_vel_x * 0.02, 10.0 * delta)
 		if is_on_floor():
-			mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, -velocity.x * 0.05, 10.0 * delta)
+			mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, -_smooth_vel_x * 0.05, 10.0 * delta)
 
 	ScoreManager.add_distance(GameManager.current_speed * delta)
 
@@ -142,3 +146,4 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_boost_multiplier = 1.0
 		_boost_timer = 0.0
 		_was_on_floor = false
+		_smooth_vel_x = 0.0
