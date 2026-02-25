@@ -82,8 +82,9 @@ func _make_fallback_chunk() -> Node3D:
 
 	# Side wall geometry: position the panel center so its inner edge
 	# meets the floor edge at (±FLOOR_WIDTH/2, 0).
-	var wall_cx: float = FLOOR_WIDTH * 0.5 + WALL_WIDTH * 0.5 * cos(WALL_ANGLE)
-	var wall_cy: float = WALL_WIDTH * 0.5 * sin(WALL_ANGLE)
+	# Account for panel thickness so the inner top edge is flush with the floor at y=0
+	var wall_cx: float = FLOOR_WIDTH * 0.5 + WALL_WIDTH * 0.5 * cos(WALL_ANGLE) + PANEL_THICKNESS * 0.5 * sin(WALL_ANGLE)
+	var wall_cy: float = WALL_WIDTH * 0.5 * sin(WALL_ANGLE) - PANEL_THICKNESS * 0.5 * cos(WALL_ANGLE)
 	var wall_size := Vector3(WALL_WIDTH, PANEL_THICKNESS, CHUNK_LENGTH)
 
 	# Left wall — rotated inward (negative Z rotation tilts right edge down to meet floor)
