@@ -1,10 +1,11 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/world/level_generator.gd" id="2_levelgen"]
 [ext_resource type="Script" path="res://scripts/world/camera_rig.gd" id="3_camrig"]
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="4_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/player/jerry_trail.tscn" id="6_trail"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_jerry"]
 albedo_color = Color(1.0, 0.45, 0.05, 1)
@@ -62,6 +63,8 @@ script = ExtResource("4_player")
 [node name="BoarderMesh" type="MeshInstance3D" parent="Player/MeshPivot"]
 position = Vector3(0, 0.5, 0)
 mesh = SubResource("BoxMesh_boarder")
+
+[node name="JerryTrail" parent="Player" instance=ExtResource("6_trail")]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 position = Vector3(0, 0.5, 0)
