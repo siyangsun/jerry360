@@ -6,8 +6,8 @@ extends Node3D
 func _ready() -> void:
 	if not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player") as CharacterBody3D
-@export var offset := Vector3(0.0, 6.0, 10.0)   # behind and above
-@export var look_offset := Vector3(0.0, 0.0, -15.0)  # point ahead of player
+@export var offset := Vector3(0.0, 2.5, 8.0)   # behind and above
+@export var look_offset := Vector3(0.0, 2.0, -12.0)  # point ahead of player
 @export var follow_speed := 8.0
 @export var lateral_follow_speed := 12.0
 
