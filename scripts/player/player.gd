@@ -1,11 +1,11 @@
 extends CharacterBody3D
 
-const LATERAL_ACCEL := 22.0
-const LATERAL_FRICTION := 16.0
-const LATERAL_COUNTER_DECEL := 42.0
-const MAX_LATERAL_SPEED := 13.0
-const JUMP_VELOCITY := 10.0
-const GRAVITY := 24.0
+@export var lateral_accel := 22.0
+@export var lateral_friction := 16.0
+@export var lateral_counter_decel := 85.0
+@export var max_lateral_speed := 13.0
+@export var jump_velocity := 10.0
+@export var gravity := 24.0
 
 var _is_dead: bool = false
 
@@ -44,23 +44,23 @@ func _handle_lateral(delta: float) -> void:
 	if input != 0.0:
 		if velocity.x * input < 0.0:
 			# Counter-steering: shed opposite velocity faster
-			velocity.x = move_toward(velocity.x, 0.0, LATERAL_COUNTER_DECEL * delta)
+			velocity.x = move_toward(velocity.x, 0.0, lateral_counter_decel * delta)
 		else:
 			# Same direction or from rest: normal acceleration
-			velocity.x = clampf(velocity.x + input * LATERAL_ACCEL * delta, -MAX_LATERAL_SPEED, MAX_LATERAL_SPEED)
+			velocity.x = clampf(velocity.x + input * lateral_accel * delta, -max_lateral_speed, max_lateral_speed)
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, LATERAL_FRICTION * delta)
+		velocity.x = move_toward(velocity.x, 0.0, lateral_friction * delta)
 
 
 func _handle_jump() -> void:
 	if is_on_floor() and Input.is_action_just_pressed("jump"):
-		velocity.y = JUMP_VELOCITY
+		velocity.y = jump_velocity
 		# velocity.x intentionally unchanged — lateral momentum carries into jump
 
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
+		velocity.y -= gravity * delta
 
 
 func _fall_off() -> void:
