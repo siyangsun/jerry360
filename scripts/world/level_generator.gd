@@ -13,6 +13,15 @@ const WALL_WIDTH := 4.5     # each angled side panel
 const WALL_ANGLE := 0.6981  # deg_to_rad(40) — slope of side panels from horizontal
 const PANEL_THICKNESS := 0.5
 
+# Ramps
+const RAMP_ANGLE := 0.175   # deg_to_rad(10) — shallow enough to ride onto without jumping
+const RAMP_LENGTH := 7.0
+const RAMP_WIDTH := 5.0
+const RAMP_THICKNESS := 0.1
+const RAMP_SPAWN_CHANCE := 0.75  # chance per slot
+const RAMP_SLOT_SPACING := 44.0  # meters between spawn slots
+const RAMP_MARGIN := 15.0        # clear space at each chunk end
+
 @export var chunk_scenes: Array[PackedScene] = []
 @export var player: CharacterBody3D
 
@@ -91,7 +100,55 @@ func _make_fallback_chunk() -> Node3D:
 		wall_size
 	))
 
+	_maybe_add_ramps(root)
 	return root
+
+
+func _maybe_add_ramps(root: Node3D) -> void:
+	var z := -RAMP_MARGIN
+	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
+		if randf() < RAMP_SPAWN_CHANCE:
+			var max_offset := FLOOR_WIDTH * 0.5 - RAMP_WIDTH * 0.5
+			var rx := randf_range(-max_offset, max_offset)
+			root.add_child(_make_ramp(Vector3(rx, 0.0, z)))
+		z -= RAMP_SLOT_SPACING
+
+
+func _make_ramp(origin: Vector3) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.position = origin  # y=0, sits on floor
+
+	var w := RAMP_WIDTH
+	var l := RAMP_LENGTH
+	var h := l * tan(RAMP_ANGLE)  # peak height at back end
+
+	# Wedge collision: front edge flush with floor (y=0), back has depth below floor
+	var col := CollisionShape3D.new()
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = PackedVector3Array([
+		Vector3(-w * 0.5,  0.0,  l * 0.5),  # front left  — flush with floor
+		Vector3( w * 0.5,  0.0,  l * 0.5),  # front right — flush with floor
+		Vector3(-w * 0.5, -1.0, -l * 0.5),  # back bottom left  — solid base
+		Vector3( w * 0.5, -1.0, -l * 0.5),  # back bottom right — solid base
+		Vector3(-w * 0.5,  h,   -l * 0.5),  # back top left
+		Vector3( w * 0.5,  h,   -l * 0.5),  # back top right
+	])
+	col.shape = shape
+	body.add_child(col)
+
+	# Visual: tilted box slab
+	var mesh_inst := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(w, RAMP_THICKNESS, l)
+	mesh_inst.mesh = box
+	mesh_inst.rotation.x = RAMP_ANGLE
+	mesh_inst.position.y = RAMP_THICKNESS * 0.5 * cos(RAMP_ANGLE) + l * 0.5 * sin(RAMP_ANGLE)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.82, 0.91, 1.0)
+	mesh_inst.material_override = mat
+	body.add_child(mesh_inst)
+
+	return body
 
 
 func _make_panel(pos: Vector3, rot_z: float, size: Vector3) -> StaticBody3D:
