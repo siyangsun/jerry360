@@ -66,6 +66,7 @@ func _physics_process(delta: float) -> void:
 
 	_handle_lateral(delta)
 	_handle_jump()
+	_handle_rail_lock()
 	_apply_gravity(delta)
 
 	velocity.z = -GameManager.current_speed
@@ -104,7 +105,7 @@ func _physics_process(delta: float) -> void:
 
 	# Visual tilt and yaw — velocity-based on ground, spin-based in air
 	if is_instance_valid(mesh_pivot):
-		if not _is_leaning_fwd and not _is_leaning_back:
+		if not _is_leaning_fwd and not _is_leaning_back and not _is_on_rail():
 			if Input.is_action_just_pressed("move_right"):
 				_turn_burst_frames = TURN_BURST_FRAMES
 				_turn_burst_dir = 1.0
@@ -129,18 +130,19 @@ func _physics_process(delta: float) -> void:
 			snowboard_mesh.rotation.y = mesh_pivot.rotation.y
 			snowboard_mesh.rotation.z = mesh_pivot.rotation.z
 		if is_on_floor():
-			var ground_yaw := -_smooth_vel_x * 0.05
-			var recovery_yaw_min := LEAN_FORWARD_RECOVERY_YAW if _is_leaning_fwd else RECOVERY_YAW_MIN
-			if _yaw_recovery:
-				var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
-				if yaw_diff > recovery_yaw_min:
-					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, RECOVERY_LERP_SPEED * delta)
-					GameManager.current_speed = maxf(GameManager.current_speed - RECOVERY_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
+			if not _is_on_rail():
+				var ground_yaw := -_smooth_vel_x * 0.05
+				var recovery_yaw_min := LEAN_FORWARD_RECOVERY_YAW if _is_leaning_fwd else RECOVERY_YAW_MIN
+				if _yaw_recovery:
+					var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
+					if yaw_diff > recovery_yaw_min:
+						mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, RECOVERY_LERP_SPEED * delta)
+						GameManager.current_speed = maxf(GameManager.current_speed - RECOVERY_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
+					else:
+						_end_recovery()
+						mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
 				else:
-					_end_recovery()
 					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
-			else:
-				mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
 		elif _yaw_recovery:
 			# Became airborne mid-recovery — cancel cleanly
 			_end_recovery()
@@ -168,6 +170,9 @@ func _handle_lateral(delta: float) -> void:
 func _handle_jump() -> void:
 	if is_on_floor() and Input.is_action_just_pressed("jump"):
 		velocity.y = jump_velocity
+		if _is_on_rail():
+			var dir := Input.get_axis("move_left", "move_right")
+			velocity.x = dir * max_lateral_speed
 
 
 func _apply_gravity(delta: float) -> void:
@@ -183,7 +188,7 @@ func _apply_wall_gravity(delta: float) -> void:
 
 
 func _handle_air_spin(delta: float) -> void:
-	if is_on_floor():
+	if is_on_floor() and not _is_on_rail():
 		return
 	var input := Input.get_axis("move_left", "move_right")
 	_air_spin_y -= input * AIR_SPIN_SPEED * delta
@@ -234,9 +239,16 @@ func die() -> void:
 
 
 func _handle_lean_forward(delta: float) -> void:
-	if not _is_leaning_fwd:
+	if not _is_leaning_fwd or _is_on_rail():
 		return
 	GameManager.current_speed = minf(GameManager.current_speed + LEAN_FORWARD_ACCEL * delta, GameManager.MAX_SPEED)
+
+
+func _handle_rail_lock() -> void:
+	# Grinding: lock lateral position; jump or lean-forward releases it
+	if not _is_on_rail() or velocity.y > 0.0 or _is_leaning_fwd:
+		return
+	velocity.x = 0.0
 
 
 func _handle_lean_back(delta: float) -> void:
