@@ -1,8 +1,8 @@
 extends CharacterBody3D
 
-@export var lateral_accel := 22.0
+@export var lateral_accel := 30.0
 @export var lateral_friction := 16.0
-@export var lateral_counter_decel := 85.0
+@export var lateral_counter_decel := 100.0
 @export var max_lateral_speed := 13.0
 @export var jump_velocity := 10.0
 @export var gravity := 24.0
@@ -13,6 +13,11 @@ const BOOST_AMOUNT := 2.0      # multiplier on accel/decel after landing trick
 const BOOST_DURATION := 1.5    # seconds the boost lasts
 const BOOST_THRESHOLD := 0.15  # minimum air spin (rad) to earn a boost
 
+const RECOVERY_YAW_MIN := 0.12      # yaw diff below which recovery is done
+const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery (normal = 10.0)
+const RECOVERY_SPEED_DRAIN := 2.0   # forward speed lost per second while recovering
+const RECOVERY_LATERAL_FACTOR := 0.15  # fraction of forward speed pushed sideways on landing
+
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
@@ -21,6 +26,7 @@ var _boost_timer: float = 0.0
 var _smooth_vel_x: float = 0.0
 var _spark_particles: GPUParticles3D
 var _land_particles: GPUParticles3D
+var _yaw_recovery: bool = false
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 
@@ -64,9 +70,27 @@ func _physics_process(delta: float) -> void:
 
 	# Visual tilt and yaw — velocity-based on ground, spin-based in air
 	if is_instance_valid(mesh_pivot):
-		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, -_smooth_vel_x * 0.02, 10.0 * delta)
+		var lean_target := -lateral_input * 0.28 - _smooth_vel_x * 0.008
+		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
 		if is_on_floor():
-			mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, -_smooth_vel_x * 0.05, 10.0 * delta)
+			var ground_yaw := -_smooth_vel_x * 0.05
+			if _yaw_recovery:
+				var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
+				if yaw_diff > RECOVERY_YAW_MIN:
+					# Slowly correct yaw, bleed speed, spray particles
+					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, RECOVERY_LERP_SPEED * delta)
+					GameManager.current_speed = maxf(GameManager.current_speed - RECOVERY_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
+					_land_particles.one_shot = false
+					_land_particles.explosiveness = 0.0
+					_land_particles.emitting = true
+				else:
+					_end_recovery()
+					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
+			else:
+				mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
+		elif _yaw_recovery:
+			# Became airborne mid-recovery — cancel cleanly
+			_end_recovery()
 
 	ScoreManager.add_distance(GameManager.current_speed * delta)
 
@@ -116,6 +140,10 @@ func _handle_landing() -> void:
 	if on_floor and not _was_on_floor:
 		if not _is_on_rail():
 			_land_particles.restart()
+		if abs(_air_spin_y) > RECOVERY_YAW_MIN:
+			_yaw_recovery = true
+			# Push Jerry sideways proportional to yaw, but well below forward speed
+			velocity.x = clampf(sin(_air_spin_y) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
 		if abs(_air_spin_y) >= BOOST_THRESHOLD:
 			_boost_multiplier = BOOST_AMOUNT
 			_boost_timer = BOOST_DURATION
@@ -148,6 +176,13 @@ func die() -> void:
 	_is_dead = true
 	velocity = Vector3.ZERO
 	GameManager.player_died()
+
+
+func _end_recovery() -> void:
+	_yaw_recovery = false
+	_land_particles.emitting = false
+	_land_particles.one_shot = true
+	_land_particles.explosiveness = 1.0
 
 
 func _is_on_rail() -> bool:
@@ -241,3 +276,4 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_was_on_floor = false
 		_smooth_vel_x = 0.0
 		_spark_particles.emitting = false
+		_end_recovery()
