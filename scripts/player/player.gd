@@ -181,7 +181,7 @@ func _handle_jump() -> void:
 		velocity.y = jump_velocity
 		if _is_on_rail() or abs(get_floor_normal().x) > 0.2:
 			var dir := Input.get_axis("move_left", "move_right")
-			velocity.x = dir * max_lateral_speed * 0.5
+			velocity.x = dir * max_lateral_speed * 0.7
 
 
 func _apply_gravity(delta: float) -> void:
