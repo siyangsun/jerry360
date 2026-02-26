@@ -30,6 +30,11 @@ const LEAN_BACK_BRAKE := 8.0           # forward speed reduction per second whil
 const LEAN_BACK_MAX_REVERSE := 2.0     # max backward speed (m/s)
 const LEAN_BACK_RECOVER_RATE := 10.0   # speed/sec to return to BASE_SPEED after releasing
 
+const RAIL_SPEED_DRAIN := 3.0          # forward speed lost per second while grinding
+const RAMP_SPEED_DRAIN := 4.0          # forward speed lost per second while on ramp
+const LEAN_FORWARD_MAX_SPEED := 55.0   # boosted max speed while leaning forward
+const LEAN_BOOST_DECAY := 15.0         # m/s per second speed decay after releasing lean
+
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
@@ -66,7 +71,7 @@ func _physics_process(delta: float) -> void:
 
 	_handle_lateral(delta)
 	_handle_jump()
-	_handle_rail_lock()
+	_handle_rail_lock(delta)
 	_apply_gravity(delta)
 
 	velocity.z = -GameManager.current_speed
@@ -77,7 +82,11 @@ func _physics_process(delta: float) -> void:
 	_handle_landing()
 	_handle_lean_forward(delta)
 	_handle_lean_back(delta)
+	_handle_ramp_drag(delta)
 	_tick_boost(delta)
+
+	if not _is_leaning_fwd and is_on_floor() and GameManager.current_speed > GameManager.MAX_SPEED:
+		GameManager.current_speed = maxf(GameManager.current_speed - LEAN_BOOST_DECAY * delta, GameManager.MAX_SPEED)
 
 	var lateral_input := Input.get_axis("move_left", "move_right")
 	GameManager.ramp_multiplier = 1.0 if abs(lateral_input) > 0.1 else GameManager.STRAIGHT_RAMP_MULT
@@ -241,14 +250,25 @@ func die() -> void:
 func _handle_lean_forward(delta: float) -> void:
 	if not _is_leaning_fwd or _is_on_rail():
 		return
-	GameManager.current_speed = minf(GameManager.current_speed + LEAN_FORWARD_ACCEL * delta, GameManager.MAX_SPEED)
+	GameManager.current_speed = minf(GameManager.current_speed + LEAN_FORWARD_ACCEL * delta, LEAN_FORWARD_MAX_SPEED)
 
 
-func _handle_rail_lock() -> void:
+func _handle_ramp_drag(delta: float) -> void:
+	if not is_on_floor() or _is_on_rail():
+		return
+	for i in get_slide_collision_count():
+		var col := get_slide_collision(i)
+		if col.get_collider() != null and col.get_collider().is_in_group("ramp"):
+			GameManager.current_speed = maxf(GameManager.current_speed - RAMP_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
+			return
+
+
+func _handle_rail_lock(delta: float) -> void:
 	# Grinding: lock lateral position; jump or lean-forward releases it
 	if not _is_on_rail() or velocity.y > 0.0 or _is_leaning_fwd:
 		return
 	velocity.x = 0.0
+	GameManager.current_speed = maxf(GameManager.current_speed - RAIL_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
 
 
 func _handle_lean_back(delta: float) -> void:

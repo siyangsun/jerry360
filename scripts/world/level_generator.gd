@@ -139,6 +139,7 @@ func _maybe_add_obstacles(root: Node3D) -> void:
 func _make_ramp(origin: Vector3, angle: float, length: float) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = origin  # y=0, sits on floor
+	body.add_to_group("ramp")
 
 	var w := RAMP_WIDTH
 	var l := length
