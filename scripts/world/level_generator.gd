@@ -8,28 +8,30 @@ const CHUNKS_AHEAD := 10
 const CHUNKS_BEHIND := 2
 
 # Concave pipe cross-section
-const FLOOR_WIDTH := 14.0   # wide flat base
+const FLOOR_WIDTH := 18.0   # wide flat base
 const WALL_WIDTH := 4.5     # each angled side panel
 const WALL_ANGLE := 0.6981  # deg_to_rad(40) — slope of side panels from horizontal
 const PANEL_THICKNESS := 0.5
 
 # Ramps
-const RAMP_ANGLE_MIN := 0.105  # deg_to_rad(6)
-const RAMP_ANGLE_MAX := 0.262  # deg_to_rad(15)
+const RAMP_ANGLE_MIN := 0.10
+const RAMP_ANGLE_MAX := 0.270
 const RAMP_LENGTH_MIN := 5.0
-const RAMP_LENGTH_MAX := 12.0
+const RAMP_LENGTH_MAX := 15.0
 const RAMP_WIDTH := 5.0
 const RAMP_THICKNESS := 0.1
-const RAMP_SPAWN_CHANCE := 0.75  # chance per slot (after rail roll)
+const RAMP_SPAWN_CHANCE := 0.5  # chance per slot (after rail roll)
 const RAMP_SLOT_SPACING := 44.0  # meters between spawn slots
 const RAMP_MARGIN := 15.0        # clear space at each chunk end
 
 # Rails
-const RAIL_SPAWN_CHANCE := 0.4   # checked first — rails are rarer than ramps
+const RAIL_SPAWN_CHANCE := 0.25   # checked first — rails are rarer than ramps
 const RAIL_WIDTH_VISUAL := 0.2
 const RAIL_WIDTH_COLLISION := 0.3  # wider than visual so Jerry stays on
 const RAIL_HEIGHT := 0.12          # thickness of the flat rail slab
-const RAIL_PEAK_HEIGHT := 1.2      # how high the flat section is above the ground
+const RAIL_LENGTH_MIN := 25.0
+const RAIL_LENGTH_MAX := 75.0
+const RAIL_PEAK_HEIGHT := 1.5      # how high the flat section is above the ground
 const RAIL_RAMP_SECTION := 4.5    # length of each ramp (on-ramp and off-ramp)
 const RAIL_RAMP_GAP := 0.1        # gap between each ramp top and the flat section
 
@@ -121,7 +123,7 @@ func _maybe_add_obstacles(root: Node3D) -> void:
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
 		if roll < RAIL_SPAWN_CHANCE:
-			var length := randf_range(14.0, 28.0)  # long enough for on+off ramps plus flat section
+			var length := randf_range(RAIL_LENGTH_MIN, RAIL_LENGTH_MAX)  # long enough for on+off ramps plus flat section
 			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
