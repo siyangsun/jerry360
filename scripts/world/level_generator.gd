@@ -3,9 +3,9 @@ extends Node3D
 # Chunk-based infinite level generation.
 # Chunks spawn ahead of the player and are recycled behind.
 
-const CHUNK_LENGTH := 240.0
-const CHUNKS_AHEAD := 4
-const CHUNKS_BEHIND := 1
+const CHUNK_LENGTH := 80.0
+const CHUNKS_AHEAD := 10
+const CHUNKS_BEHIND := 2
 
 # Concave pipe cross-section
 const FLOOR_WIDTH := 14.0   # wide flat base
