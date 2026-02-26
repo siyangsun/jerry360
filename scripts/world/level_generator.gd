@@ -24,8 +24,8 @@ const RAMP_MARGIN := 15.0        # clear space at each chunk end
 
 # Rails
 const RAIL_SPAWN_CHANCE := 0.4   # checked first — rails are rarer than ramps
-const RAIL_WIDTH_VISUAL := 0.9
-const RAIL_WIDTH_COLLISION := 1.4  # wider than visual so Jerry stays on
+const RAIL_WIDTH_VISUAL := 0.4
+const RAIL_WIDTH_COLLISION := 0.6  # wider than visual so Jerry stays on
 const RAIL_HEIGHT := 0.35
 
 @export var chunk_scenes: Array[PackedScene] = []
