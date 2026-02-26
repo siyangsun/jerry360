@@ -159,19 +159,53 @@ func _make_ramp(origin: Vector3, angle: float, length: float) -> StaticBody3D:
 	col.shape = shape
 	body.add_child(col)
 
-	# Visual: tilted box slab
+	# Visual: triangular prism
 	var mesh_inst := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(w, RAMP_THICKNESS, l)
-	mesh_inst.mesh = box
-	mesh_inst.rotation.x = angle
-	mesh_inst.position.y = RAMP_THICKNESS * 0.5 * cos(angle) + l * 0.5 * sin(angle)
+	mesh_inst.mesh = _make_ramp_visual(w, l, h, angle)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.82, 0.91, 1.0)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh_inst.material_override = mat
 	body.add_child(mesh_inst)
 
 	return body
+
+
+func _make_ramp_visual(w: float, l: float, h: float, angle: float) -> ArrayMesh:
+	var fl  := Vector3(-w * 0.5, 0.0,  l * 0.5)
+	var fr  := Vector3( w * 0.5, 0.0,  l * 0.5)
+	var bl  := Vector3(-w * 0.5, 0.0, -l * 0.5)
+	var br  := Vector3( w * 0.5, 0.0, -l * 0.5)
+	var blt := Vector3(-w * 0.5, h,   -l * 0.5)
+	var brt := Vector3( w * 0.5, h,   -l * 0.5)
+
+	var top_n  := Vector3(0.0, cos(angle), sin(angle))
+	var back_n := Vector3(0.0, 0.0, -1.0)
+	var left_n := Vector3(-1.0, 0.0, 0.0)
+	var rght_n := Vector3( 1.0, 0.0, 0.0)
+	var bot_n  := Vector3(0.0, -1.0, 0.0)
+
+	var verts := PackedVector3Array([
+		fl,  fr,  brt,   fl,  brt, blt,   # top (riding surface)
+		bl,  blt, brt,   bl,  brt, br,    # back wall
+		fl,  blt, bl,                     # left side triangle
+		fr,  br,  brt,                    # right side triangle
+	])
+	var norms := PackedVector3Array([
+		top_n,  top_n,  top_n,   top_n,  top_n,  top_n,
+		back_n, back_n, back_n,  back_n, back_n, back_n,
+		left_n, left_n, left_n,
+		rght_n, rght_n, rght_n,
+	])
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 func _make_rail(origin: Vector3, length: float) -> StaticBody3D:
