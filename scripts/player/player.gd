@@ -18,6 +18,11 @@ const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery (norm
 const RECOVERY_SPEED_DRAIN := 2.0   # forward speed lost per second while recovering
 const RECOVERY_LATERAL_FACTOR := 0.15  # fraction of forward speed pushed sideways on landing
 
+const LEAN_FORWARD_ACCEL := 6.0       # extra units/sec while leaning forward
+const LEAN_FORWARD_ANGLE := -0.22     # body tilt in radians (~12.6°)
+const LEAN_FORWARD_LATERAL_MULT := 0.5  # lateral accel/counter-decel multiplier while leaning
+const LEAN_FORWARD_RECOVERY_YAW := 0.06  # tighter recovery threshold while leaning
+
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
@@ -27,6 +32,7 @@ var _smooth_vel_x: float = 0.0
 var _spark_particles: GPUParticles3D
 var _land_particles: GPUParticles3D
 var _yaw_recovery: bool = false
+var _is_leaning_fwd: bool = false
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 
@@ -44,6 +50,8 @@ func _physics_process(delta: float) -> void:
 	if _is_dead or GameManager.state != GameManager.State.PLAYING:
 		return
 
+	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
+
 	_handle_lateral(delta)
 	_handle_jump()
 	_apply_gravity(delta)
@@ -54,6 +62,7 @@ func _physics_process(delta: float) -> void:
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
 	_handle_landing()
+	_handle_lean_forward(delta)
 	_tick_boost(delta)
 
 	var lateral_input := Input.get_axis("move_left", "move_right")
@@ -72,11 +81,14 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(mesh_pivot):
 		var lean_target := -lateral_input * 0.28 - _smooth_vel_x * 0.008
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
+		var fwd_angle := LEAN_FORWARD_ANGLE if _is_leaning_fwd else 0.0
+		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, fwd_angle, 10.0 * delta)
 		if is_on_floor():
 			var ground_yaw := -_smooth_vel_x * 0.05
+			var recovery_yaw_min := LEAN_FORWARD_RECOVERY_YAW if _is_leaning_fwd else RECOVERY_YAW_MIN
 			if _yaw_recovery:
 				var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
-				if yaw_diff > RECOVERY_YAW_MIN:
+				if yaw_diff > recovery_yaw_min:
 					# Slowly correct yaw, bleed speed, spray particles
 					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, RECOVERY_LERP_SPEED * delta)
 					GameManager.current_speed = maxf(GameManager.current_speed - RECOVERY_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
@@ -100,11 +112,12 @@ func _handle_lateral(delta: float) -> void:
 		return
 	var input := Input.get_axis("move_left", "move_right")
 	var accel_mult := _boost_multiplier
+	var lean_mult := LEAN_FORWARD_LATERAL_MULT if _is_leaning_fwd else 1.0
 	if input != 0.0:
 		if velocity.x * input < 0.0:
-			velocity.x = move_toward(velocity.x, 0.0, lateral_counter_decel * accel_mult * delta)
+			velocity.x = move_toward(velocity.x, 0.0, lateral_counter_decel * accel_mult * lean_mult * delta)
 		else:
-			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * delta, -max_lateral_speed, max_lateral_speed)
+			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * lean_mult * delta, -max_lateral_speed, max_lateral_speed)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, lateral_friction * accel_mult * delta)
 
@@ -176,6 +189,12 @@ func die() -> void:
 	_is_dead = true
 	velocity = Vector3.ZERO
 	GameManager.player_died()
+
+
+func _handle_lean_forward(delta: float) -> void:
+	if not _is_leaning_fwd:
+		return
+	GameManager.current_speed = minf(GameManager.current_speed + LEAN_FORWARD_ACCEL * delta, GameManager.MAX_SPEED)
 
 
 func _end_recovery() -> void:
