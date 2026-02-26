@@ -13,15 +13,17 @@ const BOOST_AMOUNT := 2.0      # multiplier on accel/decel after landing trick
 const BOOST_DURATION := 1.5    # seconds the boost lasts
 const BOOST_THRESHOLD := 0.15  # minimum air spin (rad) to earn a boost
 
-const RECOVERY_YAW_MIN := 0.12      # yaw diff below which recovery is done
+const RECOVERY_YAW_MIN := 0.15      # yaw diff below which recovery is done
 const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery (normal = 10.0)
 const RECOVERY_SPEED_DRAIN := 2.0   # forward speed lost per second while recovering
 const RECOVERY_LATERAL_FACTOR := 0.15  # fraction of forward speed pushed sideways on landing
 
+const TURN_BURST_ROT := 0.05          # rotation snap (bank+yaw) on initial button press (not while leaning)
+const TURN_BURST_FRAMES := 5		  # number of frames to turn burst
 const LEAN_FORWARD_ACCEL := 6.0       # extra units/sec while leaning forward
 const LEAN_FORWARD_ANGLE := -0.22     # body tilt in radians (~12.6°)
 const LEAN_FORWARD_LATERAL_MULT := 0.5  # lateral accel/counter-decel multiplier while leaning
-const LEAN_FORWARD_RECOVERY_YAW := 0.06  # tighter recovery threshold while leaning
+const LEAN_FORWARD_RECOVERY_YAW := 0.07  # tighter recovery threshold while leaning
 
 var _is_dead: bool = false
 var _was_on_floor: bool = false
@@ -33,6 +35,8 @@ var _spark_particles: GPUParticles3D
 var _land_particles: GPUParticles3D
 var _yaw_recovery: bool = false
 var _is_leaning_fwd: bool = false
+var _turn_burst_frames: int = 0
+var _turn_burst_dir: float = 0.0
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 @onready var snowboard_mesh: MeshInstance3D = $SnowboardMesh
@@ -80,6 +84,19 @@ func _physics_process(delta: float) -> void:
 
 	# Visual tilt and yaw — velocity-based on ground, spin-based in air
 	if is_instance_valid(mesh_pivot):
+		if not _is_leaning_fwd:
+			if Input.is_action_just_pressed("move_right"):
+				_turn_burst_frames = TURN_BURST_FRAMES
+				_turn_burst_dir = 1.0
+			elif Input.is_action_just_pressed("move_left"):
+				_turn_burst_frames = TURN_BURST_FRAMES
+				_turn_burst_dir = -1.0
+			if _turn_burst_frames > 0:
+				var step := _turn_burst_dir * TURN_BURST_ROT * 0.5
+				mesh_pivot.rotation.z -= step
+				mesh_pivot.rotation.y -= step
+				_turn_burst_frames -= 1
+
 		var lean_target := -lateral_input * 0.28 - _smooth_vel_x * 0.008
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
 		var fwd_angle := LEAN_FORWARD_ANGLE if _is_leaning_fwd else 0.0
