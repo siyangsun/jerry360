@@ -24,9 +24,12 @@ const RAMP_MARGIN := 15.0        # clear space at each chunk end
 
 # Rails
 const RAIL_SPAWN_CHANCE := 0.4   # checked first — rails are rarer than ramps
-const RAIL_WIDTH_VISUAL := 0.4
-const RAIL_WIDTH_COLLISION := 0.6  # wider than visual so Jerry stays on
-const RAIL_HEIGHT := 0.35
+const RAIL_WIDTH_VISUAL := 0.2
+const RAIL_WIDTH_COLLISION := 0.3  # wider than visual so Jerry stays on
+const RAIL_HEIGHT := 0.12          # thickness of the flat rail slab
+const RAIL_PEAK_HEIGHT := 1.2      # how high the flat section is above the ground
+const RAIL_RAMP_SECTION := 4.5    # length of each ramp (on-ramp and off-ramp)
+const RAIL_RAMP_GAP := 0.1        # gap between each ramp top and the flat section
 
 @export var chunk_scenes: Array[PackedScene] = []
 @export var player: CharacterBody3D
@@ -116,7 +119,7 @@ func _maybe_add_obstacles(root: Node3D) -> void:
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
 		if roll < RAIL_SPAWN_CHANCE:
-			var length := randf_range(RAMP_LENGTH, RAMP_LENGTH * 3.0)
+			var length := randf_range(14.0, 28.0)  # long enough for on+off ramps plus flat section
 			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
@@ -165,29 +168,99 @@ func _make_ramp(origin: Vector3) -> StaticBody3D:
 
 
 func _make_rail(origin: Vector3, length: float) -> StaticBody3D:
+	# Trapezoidal rail: on-ramp → elevated flat section → off-ramp.
+	# origin is the center of the whole rail; +Z = player entry side.
 	var body := StaticBody3D.new()
-	body.position = origin  # center of the rail
+	body.position = origin
 
-	# Wide collision so Jerry doesn't slide off sideways
-	var col := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(RAIL_WIDTH_COLLISION, RAIL_HEIGHT, length)
-	col.shape = shape
-	col.position.y = RAIL_HEIGHT * 0.5
-	body.add_child(col)
+	var ramp_len := RAIL_RAMP_SECTION
+	var gap     := RAIL_RAMP_GAP
+	# flat_len accounts for both ramp sections AND the gaps on each side
+	var flat_len := length - 2.0 * (ramp_len + gap)
+	# Ramp tops out at the flat section's riding surface so there is no step at the junction
+	var peak_h := RAIL_PEAK_HEIGHT + RAIL_HEIGHT
+	var ramp_angle := atan2(peak_h, ramp_len)
+	var slant_len := sqrt(ramp_len * ramp_len + peak_h * peak_h)
+	var cw := RAIL_WIDTH_COLLISION
+	var vw := RAIL_WIDTH_VISUAL
 
-	# Thin visual rail on top
-	var mesh_inst := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(RAIL_WIDTH_VISUAL, RAIL_HEIGHT, length)
-	mesh_inst.mesh = box
-	mesh_inst.position.y = RAIL_HEIGHT * 0.5
+	# Z of each ramp's high end (gap away from the flat section edge)
+	var on_peak_z  :=  flat_len * 0.5 + gap
+	var off_peak_z := -(flat_len * 0.5 + gap)
+
+	# ── Collision ─────────────────────────────────────────────────────────────
+
+	# On-ramp wedge: ground level at entry (+Z), rises to peak_h at on_peak_z
+	var col_on := CollisionShape3D.new()
+	var shape_on := ConvexPolygonShape3D.new()
+	shape_on.points = PackedVector3Array([
+		Vector3(-cw * 0.5, 0.0,    +length * 0.5),
+		Vector3(+cw * 0.5, 0.0,    +length * 0.5),
+		Vector3(-cw * 0.5, 0.0,     on_peak_z),
+		Vector3(+cw * 0.5, 0.0,     on_peak_z),
+		Vector3(-cw * 0.5, peak_h,  on_peak_z),
+		Vector3(+cw * 0.5, peak_h,  on_peak_z),
+	])
+	col_on.shape = shape_on
+	body.add_child(col_on)
+
+	# Flat elevated section (0.5 m gap on each side between it and the ramp tops)
+	var col_flat := CollisionShape3D.new()
+	var shape_flat := BoxShape3D.new()
+	shape_flat.size = Vector3(cw, RAIL_HEIGHT, flat_len)
+	col_flat.position.y = RAIL_PEAK_HEIGHT + RAIL_HEIGHT * 0.5
+	col_flat.shape = shape_flat
+	body.add_child(col_flat)
+
+	# Off-ramp wedge: peak_h at off_peak_z, ground level at exit (-Z)
+	var col_off := CollisionShape3D.new()
+	var shape_off := ConvexPolygonShape3D.new()
+	shape_off.points = PackedVector3Array([
+		Vector3(-cw * 0.5, peak_h,  off_peak_z),
+		Vector3(+cw * 0.5, peak_h,  off_peak_z),
+		Vector3(-cw * 0.5, 0.0,     off_peak_z),
+		Vector3(+cw * 0.5, 0.0,     off_peak_z),
+		Vector3(-cw * 0.5, 0.0,    -length * 0.5),
+		Vector3(+cw * 0.5, 0.0,    -length * 0.5),
+	])
+	col_off.shape = shape_off
+	body.add_child(col_off)
+
+	# ── Visuals ───────────────────────────────────────────────────────────────
+
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.72, 0.72, 0.78)
 	mat.metallic = 0.85
 	mat.roughness = 0.15
-	mesh_inst.material_override = mat
-	body.add_child(mesh_inst)
+
+	# On-ramp: center Z simplifies to (length - ramp_len) * 0.5 regardless of gap
+	var on_mesh := MeshInstance3D.new()
+	var on_box := BoxMesh.new()
+	on_box.size = Vector3(vw, RAIL_HEIGHT, slant_len)
+	on_mesh.mesh = on_box
+	on_mesh.material_override = mat
+	on_mesh.rotation.x = ramp_angle
+	on_mesh.position = Vector3(0.0, peak_h * 0.5, (length - ramp_len) * 0.5)
+	body.add_child(on_mesh)
+
+	# Flat section
+	var flat_mesh := MeshInstance3D.new()
+	var flat_box := BoxMesh.new()
+	flat_box.size = Vector3(vw, RAIL_HEIGHT, flat_len)
+	flat_mesh.mesh = flat_box
+	flat_mesh.material_override = mat
+	flat_mesh.position = Vector3(0.0, RAIL_PEAK_HEIGHT + RAIL_HEIGHT * 0.5, 0.0)
+	body.add_child(flat_mesh)
+
+	# Off-ramp
+	var off_mesh := MeshInstance3D.new()
+	var off_box := BoxMesh.new()
+	off_box.size = Vector3(vw, RAIL_HEIGHT, slant_len)
+	off_mesh.mesh = off_box
+	off_mesh.material_override = mat
+	off_mesh.rotation.x = -ramp_angle
+	off_mesh.position = Vector3(0.0, peak_h * 0.5, -(length - ramp_len) * 0.5)
+	body.add_child(off_mesh)
 
 	return body
 
