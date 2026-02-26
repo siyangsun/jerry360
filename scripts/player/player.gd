@@ -44,6 +44,9 @@ func _physics_process(delta: float) -> void:
 	_handle_landing()
 	_tick_boost(delta)
 
+	var lateral_input := Input.get_axis("move_left", "move_right")
+	GameManager.ramp_multiplier = 1.0 if abs(lateral_input) > 0.1 else GameManager.STRAIGHT_RAMP_MULT
+
 	if position.y < -50.0:
 		_fall_off()
 		return
