@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/world/level_generator.gd" id="2_levelgen"]
@@ -17,6 +17,14 @@ roughness = 0.05
 [sub_resource type="BoxMesh" id="BoxMesh_boarder"]
 size = Vector3(0.6, 1.0, 0.3)
 material = SubResource("Mat_jerry")
+
+[sub_resource type="StandardMaterial3D" id="Mat_board"]
+albedo_color = Color(0.18, 0.18, 0.18, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_board"]
+size = Vector3(0.55, 0.08, 1.2)
+material = SubResource("Mat_board")
 
 [sub_resource type="CapsuleShape3D" id="Capsule_player"]
 radius = 0.35
@@ -73,6 +81,10 @@ script = ExtResource("4_player")
 [node name="BoarderMesh" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/Player/MeshPivot"]
 position = Vector3(0, 0.5, 0)
 mesh = SubResource("BoxMesh_boarder")
+
+[node name="SnowboardMesh" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/Player/MeshPivot"]
+position = Vector3(0, 0.04, 0)
+mesh = SubResource("BoxMesh_board")
 
 [node name="JerryTrail" parent="SubViewportContainer/SubViewport/Player" instance=ExtResource("6_trail")]
 
