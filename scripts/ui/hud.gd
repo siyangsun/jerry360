@@ -7,13 +7,13 @@ extends CanvasLayer
 
 
 func _ready() -> void:
-	ScoreManager.distance_updated.connect(_on_distance_updated)
 	GameManager.state_changed.connect(_on_state_changed)
 	_on_state_changed(GameManager.state)
 
 
-func _on_distance_updated(dist: float) -> void:
-	distance_label.text = "%.0f m" % dist
+func _process(_delta: float) -> void:
+	if GameManager.state == GameManager.State.PLAYING:
+		distance_label.text = "%.0f m\n%.0f m/s" % [ScoreManager.distance, GameManager.current_speed]
 
 
 func _on_state_changed(new_state: GameManager.State) -> void:
