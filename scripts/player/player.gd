@@ -35,6 +35,7 @@ var _yaw_recovery: bool = false
 var _is_leaning_fwd: bool = false
 
 @onready var mesh_pivot: Node3D = $MeshPivot
+@onready var snowboard_mesh: MeshInstance3D = $SnowboardMesh
 
 
 func _ready() -> void:
@@ -83,6 +84,9 @@ func _physics_process(delta: float) -> void:
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
 		var fwd_angle := LEAN_FORWARD_ANGLE if _is_leaning_fwd else 0.0
 		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, fwd_angle, 10.0 * delta)
+		if is_instance_valid(snowboard_mesh):
+			snowboard_mesh.rotation.y = mesh_pivot.rotation.y
+			snowboard_mesh.rotation.z = mesh_pivot.rotation.z
 		if is_on_floor():
 			var ground_yaw := -_smooth_vel_x * 0.05
 			var recovery_yaw_min := LEAN_FORWARD_RECOVERY_YAW if _is_leaning_fwd else RECOVERY_YAW_MIN
