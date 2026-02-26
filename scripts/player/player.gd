@@ -290,7 +290,12 @@ func _make_spark_particles() -> GPUParticles3D:
 	proc.gravity = Vector3(0.0, -9.0, 0.0)
 	proc.scale_min = 0.8
 	proc.scale_max = 1.6
-	proc.color = Color(1.0, 0.85, 0.1)  # yellow
+	var color_gradient := Gradient.new()
+	color_gradient.colors = PackedColorArray([Color(1.0, 0.85, 0.1), Color(1.0, 0.25, 0.02)])
+	color_gradient.offsets = PackedFloat32Array([0.0, 1.0])
+	var color_tex := GradientTexture1D.new()
+	color_tex.gradient = color_gradient
+	proc.color_initial_ramp = color_tex
 	p.process_material = proc
 
 	var mesh := QuadMesh.new()
