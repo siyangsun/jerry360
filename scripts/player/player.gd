@@ -19,6 +19,8 @@ var _air_spin_y: float = 0.0
 var _boost_multiplier: float = 1.0
 var _boost_timer: float = 0.0
 var _smooth_vel_x: float = 0.0
+var _spark_particles: GPUParticles3D
+var _land_particles: GPUParticles3D
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 
@@ -26,6 +28,10 @@ var _smooth_vel_x: float = 0.0
 func _ready() -> void:
 	add_to_group("player")
 	GameManager.state_changed.connect(_on_state_changed)
+	_spark_particles = _make_spark_particles()
+	add_child(_spark_particles)
+	_land_particles = _make_land_particles()
+	add_child(_land_particles)
 
 
 func _physics_process(delta: float) -> void:
@@ -46,6 +52,8 @@ func _physics_process(delta: float) -> void:
 
 	var lateral_input := Input.get_axis("move_left", "move_right")
 	GameManager.ramp_multiplier = 1.0 if abs(lateral_input) > 0.1 else GameManager.STRAIGHT_RAMP_MULT
+
+	_spark_particles.emitting = _is_on_rail()
 
 	if position.y < -50.0:
 		_fall_off()
@@ -106,6 +114,8 @@ func _handle_air_spin(delta: float) -> void:
 func _handle_landing() -> void:
 	var on_floor := is_on_floor()
 	if on_floor and not _was_on_floor:
+		if not _is_on_rail():
+			_land_particles.restart()
 		if abs(_air_spin_y) >= BOOST_THRESHOLD:
 			_boost_multiplier = BOOST_AMOUNT
 			_boost_timer = BOOST_DURATION
@@ -140,6 +150,86 @@ func die() -> void:
 	GameManager.player_died()
 
 
+func _is_on_rail() -> bool:
+	if not is_on_floor():
+		return false
+	for i in get_slide_collision_count():
+		var col := get_slide_collision(i)
+		if col.get_collider() != null and col.get_collider().is_in_group("rail"):
+			return true
+	return false
+
+
+func _make_spark_particles() -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.amount = 20
+	p.lifetime = 0.3
+	p.emitting = false
+	p.local_coords = false  # particles fly off in world space
+
+	var proc := ParticleProcessMaterial.new()
+	proc.direction = Vector3(0.0, 1.0, 0.0)
+	proc.spread = 80.0
+	proc.initial_velocity_min = 1.0
+	proc.initial_velocity_max = 3.5
+	proc.gravity = Vector3(0.0, -9.0, 0.0)
+	proc.scale_min = 0.8
+	proc.scale_max = 1.6
+	proc.color = Color(1.0, 0.85, 0.1)  # yellow
+	p.process_material = proc
+
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.07, 0.07)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color.WHITE
+	mat.vertex_color_use_as_albedo = true
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mesh.surface_set_material(0, mat)
+	p.draw_pass_1 = mesh
+
+	return p
+
+
+func _make_land_particles() -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.amount = 28
+	p.lifetime = 0.55
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.emitting = false
+	p.local_coords = false
+
+	var proc := ParticleProcessMaterial.new()
+	proc.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	proc.emission_ring_axis = Vector3(0.0, 1.0, 0.0)  # ring lies flat on XZ
+	proc.emission_ring_radius = 0.35
+	proc.emission_ring_inner_radius = 0.1
+	proc.emission_ring_height = 0.05
+	proc.direction = Vector3(0.0, 0.4, 0.0)
+	proc.spread = 55.0
+	proc.initial_velocity_min = 2.5
+	proc.initial_velocity_max = 5.0
+	proc.gravity = Vector3(0.0, -5.0, 0.0)
+	proc.scale_min = 1.2
+	proc.scale_max = 2.8
+	proc.color = Color(1.0, 1.0, 1.0, 0.85)  # white
+	p.process_material = proc
+
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.1, 0.1)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color.WHITE
+	mat.vertex_color_use_as_albedo = true
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh.surface_set_material(0, mat)
+	p.draw_pass_1 = mesh
+
+	return p
+
+
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.PLAYING:
 		_is_dead = false
@@ -150,3 +240,4 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_boost_timer = 0.0
 		_was_on_floor = false
 		_smooth_vel_x = 0.0
+		_spark_particles.emitting = false

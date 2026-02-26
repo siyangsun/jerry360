@@ -176,6 +176,7 @@ func _make_rail(origin: Vector3, length: float) -> StaticBody3D:
 	# origin is the center of the whole rail; +Z = player entry side.
 	var body := StaticBody3D.new()
 	body.position = origin
+	body.add_to_group("rail")
 
 	var ramp_len := RAIL_RAMP_SECTION
 	var gap     := RAIL_RAMP_GAP
