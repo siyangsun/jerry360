@@ -18,12 +18,17 @@ const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery (norm
 const RECOVERY_SPEED_DRAIN := 2.0   # forward speed lost per second while recovering
 const RECOVERY_LATERAL_FACTOR := 0.15  # fraction of forward speed pushed sideways on landing
 
-const TURN_BURST_ROT := 0.05          # rotation snap (bank+yaw) on initial button press (not while leaning)
+const TURN_BURST_ROT := 0.05          # rotation snap (bank+yaw) on initial button press
 const TURN_BURST_FRAMES := 5		  # number of frames to turn burst
 const LEAN_FORWARD_ACCEL := 6.0       # extra units/sec while leaning forward
 const LEAN_FORWARD_ANGLE := -0.22     # body tilt in radians (~12.6°)
 const LEAN_FORWARD_LATERAL_MULT := 0.5  # lateral accel/counter-decel multiplier while leaning
 const LEAN_FORWARD_RECOVERY_YAW := 0.05  # tighter recovery threshold while leaning
+
+const LEAN_BACK_ANGLE := 0.22          # body tilt backward in radians (~12.6°)
+const LEAN_BACK_BRAKE := 8.0           # forward speed reduction per second while braking
+const LEAN_BACK_MAX_REVERSE := 2.0     # max backward speed (m/s)
+const LEAN_BACK_RECOVER_RATE := 10.0   # speed/sec to return to BASE_SPEED after releasing
 
 var _is_dead: bool = false
 var _was_on_floor: bool = false
@@ -32,9 +37,10 @@ var _boost_multiplier: float = 1.0
 var _boost_timer: float = 0.0
 var _smooth_vel_x: float = 0.0
 var _spark_particles: GPUParticles3D
-var _land_particles: GPUParticles3D
+var _snow_particles: GPUParticles3D
 var _yaw_recovery: bool = false
 var _is_leaning_fwd: bool = false
+var _is_leaning_back: bool = false
 var _turn_burst_frames: int = 0
 var _turn_burst_dir: float = 0.0
 
@@ -47,8 +53,8 @@ func _ready() -> void:
 	GameManager.state_changed.connect(_on_state_changed)
 	_spark_particles = _make_spark_particles()
 	add_child(_spark_particles)
-	_land_particles = _make_land_particles()
-	add_child(_land_particles)
+	_snow_particles = _make_snow_particles()
+	add_child(_snow_particles)
 
 
 func _physics_process(delta: float) -> void:
@@ -56,6 +62,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
+	_is_leaning_back = is_on_floor() and Input.is_action_pressed("lean_back") and not _is_leaning_fwd
 
 	_handle_lateral(delta)
 	_handle_jump()
@@ -68,12 +75,25 @@ func _physics_process(delta: float) -> void:
 	_handle_air_spin(delta)
 	_handle_landing()
 	_handle_lean_forward(delta)
+	_handle_lean_back(delta)
 	_tick_boost(delta)
 
 	var lateral_input := Input.get_axis("move_left", "move_right")
 	GameManager.ramp_multiplier = 1.0 if abs(lateral_input) > 0.1 else GameManager.STRAIGHT_RAMP_MULT
 
 	_spark_particles.emitting = _is_on_rail()
+
+	# Snow cloud: continuous when recovering or braking, one-shot burst on landing
+	var want_continuous_snow := (_yaw_recovery or _is_leaning_back) and is_on_floor()
+	if want_continuous_snow:
+		if _snow_particles.one_shot:
+			_snow_particles.one_shot = false
+			_snow_particles.explosiveness = 0.0
+		_snow_particles.emitting = true
+	elif not _snow_particles.one_shot:
+		_snow_particles.emitting = false
+		_snow_particles.one_shot = true
+		_snow_particles.explosiveness = 1.0
 
 	if position.y < -50.0:
 		_fall_off()
@@ -84,7 +104,7 @@ func _physics_process(delta: float) -> void:
 
 	# Visual tilt and yaw — velocity-based on ground, spin-based in air
 	if is_instance_valid(mesh_pivot):
-		if not _is_leaning_fwd:
+		if not _is_leaning_fwd and not _is_leaning_back:
 			if Input.is_action_just_pressed("move_right"):
 				_turn_burst_frames = TURN_BURST_FRAMES
 				_turn_burst_dir = 1.0
@@ -99,8 +119,12 @@ func _physics_process(delta: float) -> void:
 
 		var lean_target := -lateral_input * 0.28 - _smooth_vel_x * 0.008
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
-		var fwd_angle := LEAN_FORWARD_ANGLE if _is_leaning_fwd else 0.0
-		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, fwd_angle, 10.0 * delta)
+		var pitch_target := 0.0
+		if _is_leaning_fwd:
+			pitch_target = LEAN_FORWARD_ANGLE
+		elif _is_leaning_back:
+			pitch_target = LEAN_BACK_ANGLE
+		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, pitch_target, 10.0 * delta)
 		if is_instance_valid(snowboard_mesh):
 			snowboard_mesh.rotation.y = mesh_pivot.rotation.y
 			snowboard_mesh.rotation.z = mesh_pivot.rotation.z
@@ -110,12 +134,8 @@ func _physics_process(delta: float) -> void:
 			if _yaw_recovery:
 				var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
 				if yaw_diff > recovery_yaw_min:
-					# Slowly correct yaw, bleed speed, spray particles
 					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, RECOVERY_LERP_SPEED * delta)
 					GameManager.current_speed = maxf(GameManager.current_speed - RECOVERY_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
-					_land_particles.one_shot = false
-					_land_particles.explosiveness = 0.0
-					_land_particles.emitting = true
 				else:
 					_end_recovery()
 					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
@@ -134,11 +154,13 @@ func _handle_lateral(delta: float) -> void:
 	var input := Input.get_axis("move_left", "move_right")
 	var accel_mult := _boost_multiplier
 	var lean_mult := LEAN_FORWARD_LATERAL_MULT if _is_leaning_fwd else 1.0
+	var speed_ratio := clampf(GameManager.current_speed / 10.0, 0.0, 1.0)
+	var effective_max_lateral := lerpf(1.0, max_lateral_speed, speed_ratio)
 	if input != 0.0:
 		if velocity.x * input < 0.0:
 			velocity.x = move_toward(velocity.x, 0.0, lateral_counter_decel * accel_mult * lean_mult * delta)
 		else:
-			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * lean_mult * delta, -max_lateral_speed, max_lateral_speed)
+			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * lean_mult * delta, -effective_max_lateral, effective_max_lateral)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, lateral_friction * accel_mult * delta)
 
@@ -173,10 +195,9 @@ func _handle_landing() -> void:
 	var on_floor := is_on_floor()
 	if on_floor and not _was_on_floor:
 		if not _is_on_rail():
-			_land_particles.restart()
+			_snow_particles.restart()
 		if abs(_air_spin_y) > RECOVERY_YAW_MIN:
 			_yaw_recovery = true
-			# Push Jerry sideways proportional to yaw, but well below forward speed
 			velocity.x = clampf(sin(_air_spin_y) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
 		if abs(_air_spin_y) >= BOOST_THRESHOLD:
 			_boost_multiplier = BOOST_AMOUNT
@@ -218,11 +239,18 @@ func _handle_lean_forward(delta: float) -> void:
 	GameManager.current_speed = minf(GameManager.current_speed + LEAN_FORWARD_ACCEL * delta, GameManager.MAX_SPEED)
 
 
+func _handle_lean_back(delta: float) -> void:
+	if not is_on_floor():
+		return
+	if _is_leaning_back:
+		GameManager.current_speed = maxf(GameManager.current_speed - LEAN_BACK_BRAKE * delta, -LEAN_BACK_MAX_REVERSE)
+	elif GameManager.current_speed < GameManager.BASE_SPEED:
+		# Quick ramp back up after releasing
+		GameManager.current_speed = minf(GameManager.current_speed + LEAN_BACK_RECOVER_RATE * delta, GameManager.BASE_SPEED)
+
+
 func _end_recovery() -> void:
 	_yaw_recovery = false
-	_land_particles.emitting = false
-	_land_particles.one_shot = true
-	_land_particles.explosiveness = 1.0
 
 
 func _is_on_rail() -> bool:
@@ -266,7 +294,7 @@ func _make_spark_particles() -> GPUParticles3D:
 	return p
 
 
-func _make_land_particles() -> GPUParticles3D:
+func _make_snow_particles() -> GPUParticles3D:
 	var p := GPUParticles3D.new()
 	p.amount = 28
 	p.lifetime = 0.55
@@ -316,4 +344,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_was_on_floor = false
 		_smooth_vel_x = 0.0
 		_spark_particles.emitting = false
+		_snow_particles.emitting = false
+		_snow_particles.one_shot = true
+		_snow_particles.explosiveness = 1.0
 		_end_recovery()
