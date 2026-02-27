@@ -6,6 +6,7 @@ extends Node3D
 const CHUNK_LENGTH := 80.0
 const CHUNKS_AHEAD := 10
 const CHUNKS_BEHIND := 2
+const LAP_CHUNKS := 5  # how many chunks make one lap
 
 # Concave pipe cross-section
 const FLOOR_WIDTH := 18.0   # wide flat base
@@ -54,6 +55,7 @@ const RAIL_RAMP_GAP := 0.1        # gap between each ramp top and the flat secti
 
 var _active_chunks: Array[Node3D] = []
 var _spawn_z: float = 0.0  # next chunk spawn position (negative Z = forward)
+var _chunk_count: int = 0
 
 
 func _ready() -> void:
@@ -81,6 +83,7 @@ func _process(_delta: float) -> void:
 
 
 func _spawn_chunk() -> void:
+	_chunk_count += 1
 	var chunk: Node3D
 	if chunk_scenes.is_empty():
 		chunk = _make_fallback_chunk()
@@ -131,6 +134,8 @@ func _make_fallback_chunk() -> Node3D:
 	))
 
 	_maybe_add_obstacles(root)
+	if _chunk_count % LAP_CHUNKS == 0:
+		root.add_child(_make_lap_marker())
 	return root
 
 
@@ -406,6 +411,19 @@ func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
 	return mesh
 
 
+func _make_lap_marker() -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(FLOOR_WIDTH, 0.02, 0.18)
+	mi.mesh = box
+	mi.position = Vector3(0.0, 0.02, -(CHUNK_LENGTH - 0.09))
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.08, 0.08)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mi.material_override = mat
+	return mi
+
+
 func _make_panel(pos: Vector3, rot_z: float, size: Vector3, is_snow_terrain: bool = false) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = pos
@@ -443,5 +461,6 @@ func _reset() -> void:
 		chunk.queue_free()
 	_active_chunks.clear()
 	_spawn_z = 0.0
+	_chunk_count = 0
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()
