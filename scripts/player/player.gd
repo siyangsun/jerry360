@@ -18,8 +18,10 @@ const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery (norm
 const RECOVERY_SPEED_DRAIN := 2.0   # forward speed lost per second while recovering
 const RECOVERY_LATERAL_FACTOR := 0.15  # fraction of forward speed pushed sideways on landing
 
-const TURN_BURST_ROT := 0.05          # rotation snap (bank+yaw) on initial button press
-const TURN_BURST_FRAMES := 5		  # number of frames to turn burst
+const TURN_BURST_YAW := 0.10           # yaw snap per frame on initial press (rad) — board pivots visually
+const TURN_BURST_BANK := 0.025         # bank snap per frame on initial press (rad)
+const TURN_BURST_FRAMES := 5           # number of frames the burst lasts
+const TURN_BURST_ACCEL_FACTOR := 0.5   # lateral accel multiplier during burst — carve initiation lag
 const LEAN_FORWARD_ACCEL := 6.0       # extra units/sec while leaning forward
 const LEAN_FORWARD_ANGLE := -0.22     # body tilt in radians (~12.6°)
 const LEAN_FORWARD_LATERAL_MULT := 0.5  # lateral accel/counter-decel multiplier while leaning
@@ -122,9 +124,8 @@ func _physics_process(delta: float) -> void:
 				_turn_burst_frames = TURN_BURST_FRAMES
 				_turn_burst_dir = -1.0
 			if _turn_burst_frames > 0:
-				var step := _turn_burst_dir * TURN_BURST_ROT * 0.5
-				mesh_pivot.rotation.z -= step
-				mesh_pivot.rotation.y -= step
+				mesh_pivot.rotation.z -= _turn_burst_dir * TURN_BURST_BANK
+				mesh_pivot.rotation.y -= _turn_burst_dir * TURN_BURST_YAW
 				_turn_burst_frames -= 1
 
 		var lean_target := -lateral_input * 0.28 - _smooth_vel_x * 0.008
@@ -165,13 +166,14 @@ func _handle_lateral(delta: float) -> void:
 	var input := Input.get_axis("move_left", "move_right")
 	var accel_mult := _boost_multiplier
 	var lean_mult := LEAN_FORWARD_LATERAL_MULT if _is_leaning_fwd else 1.0
+	var carve_mult := TURN_BURST_ACCEL_FACTOR if (_turn_burst_frames > 0 and not _is_leaning_fwd) else 1.0
 	var speed_ratio := clampf(GameManager.current_speed / 10.0, 0.0, 1.0)
 	var effective_max_lateral := lerpf(1.0, max_lateral_speed, speed_ratio)
 	if input != 0.0:
 		if velocity.x * input < 0.0:
 			velocity.x = move_toward(velocity.x, 0.0, lateral_counter_decel * accel_mult * lean_mult * delta)
 		else:
-			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * lean_mult * delta, -effective_max_lateral, effective_max_lateral)
+			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * lean_mult * carve_mult * delta, -effective_max_lateral, effective_max_lateral)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, lateral_friction * accel_mult * delta)
 
