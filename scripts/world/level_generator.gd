@@ -13,6 +13,11 @@ const WALL_WIDTH := 4.5     # each angled side panel
 const WALL_ANGLE := 0.6981  # deg_to_rad(40) — slope of side panels from horizontal
 const PANEL_THICKNESS := 0.5
 
+# Shared snow terrain surface properties
+const SNOW_COLOR := Color(0.88, 0.94, 1.0)
+const SNOW_ROUGHNESS := 0.88
+const SNOW_TERRAIN_SPEED_DRAIN := 4.0  # forward speed lost per second when on any snow obstacle
+
 # Ramps
 const RAMP_ANGLE_MIN := 0.10
 const RAMP_ANGLE_MAX := 0.270
@@ -23,6 +28,15 @@ const RAMP_THICKNESS := 0.1
 const RAMP_SPAWN_CHANCE := 0.5  # chance per slot (after rail roll)
 const RAMP_SLOT_SPACING := 44.0  # meters between spawn slots
 const RAMP_MARGIN := 15.0        # clear space at each chunk end
+
+# Moguls
+const MOGUL_SPAWN_CHANCE := 0.25
+const MOGUL_BASE := 1.2           # half-width of square base
+const MOGUL_HEIGHT := 0.6         # apex above floor — "slightly" sticking out
+const MOGUL_SINK := 0.08          # base sinks this far below y=0 so it's flush
+const MOGULS_PER_FIELD_MIN := 5
+const MOGULS_PER_FIELD_MAX := 10
+const MOGUL_FIELD_SPREAD_Z := 16.0
 
 # Rails
 const RAIL_SPAWN_CHANCE := 0.25   # checked first — rails are rarer than ramps
@@ -104,14 +118,16 @@ func _make_fallback_chunk() -> Node3D:
 	root.add_child(_make_panel(
 		Vector3(-wall_cx, wall_cy, center_z),
 		-WALL_ANGLE,
-		wall_size
+		wall_size,
+		true
 	))
 
 	# Right wall — mirrored
 	root.add_child(_make_panel(
 		Vector3(wall_cx, wall_cy, center_z),
 		WALL_ANGLE,
-		wall_size
+		wall_size,
+		true
 	))
 
 	_maybe_add_obstacles(root)
@@ -127,7 +143,9 @@ func _maybe_add_obstacles(root: Node3D) -> void:
 			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
-		elif roll < RAIL_SPAWN_CHANCE + RAMP_SPAWN_CHANCE:
+		elif roll < RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE:
+			root.add_child(_make_mogul_field(Vector3(0.0, 0.0, z)))
+		elif roll < RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE + RAMP_SPAWN_CHANCE:
 			var max_offset := FLOOR_WIDTH * 0.5 - RAMP_WIDTH * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
@@ -139,7 +157,7 @@ func _maybe_add_obstacles(root: Node3D) -> void:
 func _make_ramp(origin: Vector3, angle: float, length: float) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = origin  # y=0, sits on floor
-	body.add_to_group("ramp")
+	body.add_to_group("snow_terrain")
 
 	var w := RAMP_WIDTH
 	var l := length
@@ -163,7 +181,8 @@ func _make_ramp(origin: Vector3, angle: float, length: float) -> StaticBody3D:
 	var mesh_inst := MeshInstance3D.new()
 	mesh_inst.mesh = _make_ramp_visual(w, l, h, angle)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.82, 0.91, 1.0)
+	mat.albedo_color = SNOW_COLOR
+	mat.roughness = SNOW_ROUGHNESS
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh_inst.material_override = mat
 	body.add_child(mesh_inst)
@@ -307,15 +326,102 @@ func _make_rail(origin: Vector3, length: float) -> StaticBody3D:
 	return body
 
 
-func _make_panel(pos: Vector3, rot_z: float, size: Vector3) -> StaticBody3D:
+func _make_mogul_field(center: Vector3) -> Node3D:
+	var field := Node3D.new()
+	field.position = center
+	field.name = "MogulField"
+	var count := randi_range(MOGULS_PER_FIELD_MIN, MOGULS_PER_FIELD_MAX)
+	var max_x := FLOOR_WIDTH * 0.5 - MOGUL_BASE
+	for i in range(count):
+		var ox := randf_range(-max_x, max_x)
+		var oz := randf_range(-MOGUL_FIELD_SPREAD_Z * 0.5, MOGUL_FIELD_SPREAD_Z * 0.5)
+		field.add_child(_make_mogul(Vector3(ox, 0.0, oz)))
+	return field
+
+
+func _make_mogul(pos: Vector3) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.position = pos
+	body.add_to_group("snow_terrain")
+
+	var b := MOGUL_BASE
+	var h := MOGUL_HEIGHT
+	var g := MOGUL_SINK
+
+	var col := CollisionShape3D.new()
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = PackedVector3Array([
+		Vector3(-b, -g,  b),
+		Vector3( b, -g,  b),
+		Vector3(-b, -g, -b),
+		Vector3( b, -g, -b),
+		Vector3( 0,  h,  0),
+	])
+	col.shape = shape
+	body.add_child(col)
+
+	var mesh_inst := MeshInstance3D.new()
+	mesh_inst.mesh = _make_mogul_mesh(b, h, g)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = SNOW_COLOR
+	mat.roughness = SNOW_ROUGHNESS
+	mesh_inst.material_override = mat
+	body.add_child(mesh_inst)
+
+	return body
+
+
+func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
+	var apex := Vector3( 0,  h,  0)
+	var fl   := Vector3(-b, -g,  b)
+	var fr   := Vector3( b, -g,  b)
+	var bl   := Vector3(-b, -g, -b)
+	var br   := Vector3( b, -g, -b)
+
+	var front_n := (fr - fl).cross(apex - fl).normalized()
+	var back_n  := (bl - br).cross(apex - br).normalized()
+	var left_n  := (fl - bl).cross(apex - bl).normalized()
+	var right_n := (br - fr).cross(apex - fr).normalized()
+
+	var verts := PackedVector3Array([
+		fl, fr, apex,
+		br, bl, apex,
+		bl, fl, apex,
+		fr, br, apex,
+	])
+	var norms := PackedVector3Array([
+		front_n, front_n, front_n,
+		back_n,  back_n,  back_n,
+		left_n,  left_n,  left_n,
+		right_n, right_n, right_n,
+	])
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+func _make_panel(pos: Vector3, rot_z: float, size: Vector3, is_snow_terrain: bool = false) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = pos
 	body.rotation.z = rot_z
+	if is_snow_terrain:
+		body.add_to_group("snow_terrain")
 
 	var mesh_inst := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = size
 	mesh_inst.mesh = box
+	if is_snow_terrain:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = SNOW_COLOR
+		mat.roughness = SNOW_ROUGHNESS
+		mesh_inst.material_override = mat
 	body.add_child(mesh_inst)
 
 	var col := CollisionShape3D.new()

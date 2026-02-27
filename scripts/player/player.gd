@@ -30,8 +30,8 @@ const LEAN_BACK_BRAKE := 8.0           # forward speed reduction per second whil
 const LEAN_BACK_MAX_REVERSE := 2.0     # max backward speed (m/s)
 const LEAN_BACK_RECOVER_RATE := 10.0   # speed/sec to return to BASE_SPEED after releasing
 
-const RAIL_SPEED_DRAIN := 3.0          # forward speed lost per second while grinding
-const RAMP_SPEED_DRAIN := 4.0          # forward speed lost per second while on ramp
+const RAIL_SPEED_DRAIN := 3.0               # forward speed lost per second while grinding
+const SNOW_TERRAIN_SPEED_DRAIN := 4.0       # forward speed lost per second on any snow obstacle (ramps, moguls, walls)
 const LEAN_FORWARD_MAX_SPEED := 55.0   # boosted max speed while leaning forward
 const LEAN_BOOST_DECAY := 15.0         # m/s per second speed decay after releasing lean
 
@@ -82,7 +82,7 @@ func _physics_process(delta: float) -> void:
 	_handle_landing()
 	_handle_lean_forward(delta)
 	_handle_lean_back(delta)
-	_handle_ramp_drag(delta)
+	_handle_snow_terrain_drag(delta)
 	_tick_boost(delta)
 
 	if not _is_leaning_fwd and is_on_floor() and GameManager.current_speed > GameManager.MAX_SPEED:
@@ -253,13 +253,13 @@ func _handle_lean_forward(delta: float) -> void:
 	GameManager.current_speed = minf(GameManager.current_speed + LEAN_FORWARD_ACCEL * delta, LEAN_FORWARD_MAX_SPEED)
 
 
-func _handle_ramp_drag(delta: float) -> void:
+func _handle_snow_terrain_drag(delta: float) -> void:
 	if not is_on_floor() or _is_on_rail():
 		return
 	for i in get_slide_collision_count():
 		var col := get_slide_collision(i)
-		if col.get_collider() != null and col.get_collider().is_in_group("ramp"):
-			GameManager.current_speed = maxf(GameManager.current_speed - RAMP_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
+		if col.get_collider() != null and col.get_collider().is_in_group("snow_terrain"):
+			GameManager.current_speed = maxf(GameManager.current_speed - SNOW_TERRAIN_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
 			return
 
 
