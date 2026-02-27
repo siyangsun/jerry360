@@ -9,7 +9,7 @@ extends Node3D
 
 const SPEED_CAM_HEIGHT_DROP := 1.0  # how much lower the camera gets at max speed
 const SPEED_CAM_LOOK_RISE   := 1.0  # how much higher the look target gets at max speed
-const LATERAL_SWAY_MULT     := 0.04 # look-target x shift per m/s of lateral velocity
+const LATERAL_SWAY_MULT     := -0.04 # look-target x shift per m/s of lateral velocity
 
 
 func _ready() -> void:

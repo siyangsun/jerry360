@@ -40,8 +40,8 @@ const MOGUL_FIELD_SPREAD_Z := 16.0
 
 # Rails
 const RAIL_SPAWN_CHANCE := 0.25   # checked first — rails are rarer than ramps
-const RAIL_WIDTH_VISUAL := 0.2
-const RAIL_WIDTH_COLLISION := 0.3  # wider than visual so Jerry stays on
+const RAIL_WIDTH_VISUAL := 0.25
+const RAIL_WIDTH_COLLISION := 0.4  # wider than visual so Jerry stays on
 const RAIL_HEIGHT := 0.12          # thickness of the flat rail slab
 const RAIL_LENGTH_MIN := 25.0
 const RAIL_LENGTH_MAX := 75.0
