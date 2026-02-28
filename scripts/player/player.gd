@@ -241,14 +241,14 @@ func _handle_board_turn(delta: float) -> void:
 		_board_yaw = move_toward(_board_yaw, 0.0, BOARD_TURN_RETURN * delta)
 
 
-# Wipeout if lean and turn are held in opposing directions
+# Wipeout if lean and turn are held in opposing directions, or if you turn without leaning
 func _handle_conflict_check(delta: float) -> void:
 	if not is_on_floor() or GameManager.current_speed < CONFLICT_MIN_SPEED:
 		_conflict_timer = 0.0
 		return
 	var lean_input := Input.get_axis("lean_left", "lean_right")
 	var turn_input := Input.get_axis("move_left", "move_right")
-	if lean_input * turn_input < -0.09:  # both > ~0.3 in opposing directions
+	if lean_input * turn_input < -0.09 or (lean_input == 0 and abs(turn_input) > 0):  # both > ~0.3 in opposing directions
 		_conflict_timer += delta
 		if _conflict_timer >= CONFLICT_WIPEOUT_TIME:
 			_conflict_timer = 0.0

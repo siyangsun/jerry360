@@ -1,7 +1,7 @@
 # TODO
 - fix goofy (it is all backwards)
 - rail grind should let you freely rotate your feet / body or lean
-- should only be able to yaw if already tilting
+- if you tilt too hard without yaw you should wipe out
 
 # Ideas
 ### immediate features
@@ -12,6 +12,7 @@
 
 ### cool aesthetic things to add soon
 - character model
+- indicators that you're losing balance and might wipe out
 
 ### blue sky
 - multiple levels; alternate game modes (time trial vs. trick scoring vs. infinite survival)
