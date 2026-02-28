@@ -44,6 +44,9 @@ const SLOPPY_SPEED_PENALTY := 15.0  # m/s lost on a sloppy landing
 const WIPEOUT_DURATION := 2.2       # seconds of wipeout before Jerry gets up
 const WIPEOUT_BRAKE_RATE := 40.0    # m/s² braking during wipeout
 
+signal stance_changed(goofy: bool)
+
+var is_goofy: bool = false
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
@@ -166,7 +169,8 @@ func _physics_process(delta: float) -> void:
 			snowboard_mesh.rotation.z = mesh_pivot.rotation.z
 		if is_on_floor():
 			if not _is_on_rail():
-				var ground_yaw := -_smooth_vel_x * 0.05
+				var stance_offset := PI if is_goofy else 0.0
+				var ground_yaw := stance_offset - _smooth_vel_x * 0.05
 				var recovery_yaw_min := LEAN_FORWARD_RECOVERY_YAW if _is_leaning_fwd else RECOVERY_YAW_MIN
 				if _yaw_recovery:
 					var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
@@ -239,7 +243,8 @@ func _handle_air_spin(delta: float) -> void:
 			_rail_tricks = earned
 			ScoreManager.add_trick(false)
 	if is_instance_valid(mesh_pivot):
-		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, _air_spin_y, 8.0 * delta)
+		var stance_offset := PI if is_goofy else 0.0
+		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, stance_offset + _air_spin_y, 8.0 * delta)
 
 
 func _handle_landing() -> void:
@@ -260,14 +265,23 @@ func _handle_landing() -> void:
 				_start_wipeout()
 				_was_on_floor = on_floor
 				return
-			elif overshoot >= STOMP_THRESHOLD:
+			if int(nearest_n) % 2 == 1:
+				is_goofy = !is_goofy
+				stance_changed.emit(is_goofy)
+			if overshoot >= STOMP_THRESHOLD:
 				GameManager.current_speed = maxf(GameManager.current_speed - SLOPPY_SPEED_PENALTY, GameManager.BASE_SPEED)
 			else:
 				ScoreManager.add_trick(true)
-		if abs(_air_spin_y) > RECOVERY_YAW_MIN:
+		# Normalize mesh to within PI of the post-landing stance so recovery lerps the short way
+		var stance_after := PI if is_goofy else 0.0
+		if is_instance_valid(mesh_pivot):
+			mesh_pivot.rotation.y = stance_after + wrapf(mesh_pivot.rotation.y - stance_after, -PI, PI)
+		# Residual = how far off the nearest valid orientation (any PI multiple)
+		var residual := wrapf(_air_spin_y, -PI, PI)
+		if abs(residual) > RECOVERY_YAW_MIN:
 			_yaw_recovery = true
-			velocity.x = clampf(sin(_air_spin_y) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
-		if abs(_air_spin_y) >= BOOST_THRESHOLD:
+			velocity.x = clampf(sin(residual) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
+		if abs(residual) >= BOOST_THRESHOLD:
 			_boost_multiplier = BOOST_AMOUNT
 			_boost_timer = BOOST_DURATION
 		_air_spin_y = 0.0
@@ -349,6 +363,8 @@ func _start_wipeout() -> void:
 	_boost_timer = 0.0
 	_was_on_rail = false
 	_was_on_snow = false
+	is_goofy = false
+	stance_changed.emit(false)
 	SfxManager.set_grinding(false)
 	SfxManager.set_on_snow(false)
 	ScoreManager.reset_combo()
@@ -488,6 +504,8 @@ func _make_snow_particles() -> GPUParticles3D:
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.PLAYING:
 		_is_dead = false
+		is_goofy = false
+		stance_changed.emit(false)
 		velocity = Vector3.ZERO
 		position = Vector3(0.0, 3.0, 0.0)
 		_air_spin_y = 0.0

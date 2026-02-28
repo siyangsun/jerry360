@@ -12,6 +12,8 @@ var _lap_time: float = 0.0
 var _best_lap: float = INF
 var _next_lap_dist: float = LAP_DISTANCE
 var _combo_label: Label
+var _goofy_label: Label
+var _goofy_time: float = 0.0
 
 
 func _ready() -> void:
@@ -22,12 +24,30 @@ func _ready() -> void:
 	_combo_label.position.y = 16
 	_combo_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	add_child(_combo_label)
+
+	_goofy_label = Label.new()
+	_goofy_label.text = "GOOFY"
+	_goofy_label.visible = false
+	_goofy_label.add_theme_font_size_override("font_size", 72)
+	_goofy_label.set_anchors_preset(Control.PRESET_CENTER)
+	_goofy_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_goofy_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	add_child(_goofy_label)
+
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	GameManager.state_changed.connect(_on_state_changed)
+	var player := get_tree().get_first_node_in_group("player")
+	if player:
+		player.stance_changed.connect(_on_stance_changed)
 	_on_state_changed(GameManager.state)
 
 
 func _process(delta: float) -> void:
+	if _goofy_label.visible:
+		_goofy_time += delta
+		_goofy_label.position.x = sin(_goofy_time * 27.0) * 6.0
+		_goofy_label.position.y = sin(_goofy_time * 19.0) * 4.0
+
 	if GameManager.state == GameManager.State.PLAYING:
 		_elapsed += delta
 		_lap_time += delta
@@ -58,6 +78,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	distance_label.visible = new_state == GameManager.State.PLAYING
 	if new_state != GameManager.State.PLAYING:
 		_combo_label.visible = false
+		_goofy_label.visible = false
 
 	if new_state == GameManager.State.PLAYING:
 		_elapsed = 0.0
@@ -69,6 +90,12 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		var best := ScoreManager.high_score
 		var deaths := ScoreManager.deaths
 		death_label.text = "He fell.\n%.0f meters — not bad for a Tuesday.\n\nBest: %.0f m  |  Falls: %d" % [dist, best, deaths]
+
+
+func _on_stance_changed(goofy: bool) -> void:
+	_goofy_label.visible = goofy and GameManager.state == GameManager.State.PLAYING
+	if goofy:
+		_goofy_time = 0.0
 
 
 func _on_start_pressed() -> void:
