@@ -4,45 +4,54 @@ extends CharacterBody3D
 @export var lateral_friction := 16.0
 @export var lateral_counter_decel := 100.0
 @export var max_lateral_speed := 13.0
+@export var lean_max_lateral := 5.0        # max lateral speed contribution from lean (A/D)
 @export var jump_velocity := 10.0
 @export var gravity := 24.0
 @export var wall_gravity := 18.0
 
-const AIR_SPIN_SPEED := 2.6    # rad/s of yaw input can apply in air
+const AIR_TURN_SPEED := 4.0    # rad/s of turn input (arrows) in air — spin/tricks
+const AIR_LEAN_FORCE := 4.0    # lateral accel from lean input (A/D) in air
 const BOOST_AMOUNT := 2.0      # multiplier on accel/decel after landing trick
 const BOOST_DURATION := 1.5    # seconds the boost lasts
 const BOOST_THRESHOLD := 0.15  # minimum air spin (rad) to earn a boost
 
 const RECOVERY_YAW_MIN := 0.10      # yaw diff below which recovery is done
-const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery (normal = 10.0)
+const RECOVERY_LERP_SPEED := 1.8    # yaw correction speed during recovery
 const RECOVERY_SPEED_DRAIN := 2.0   # forward speed lost per second while recovering
 const RECOVERY_LATERAL_FACTOR := 0.15  # fraction of forward speed pushed sideways on landing
 
-const TURN_BURST_YAW := 0.10           # yaw snap per frame on initial press (rad) — board pivots visually
-const TURN_BURST_BANK := 0.025         # bank snap per frame on initial press (rad)
+const TURN_BURST_YAW := 0.03           # yaw snap per frame on initial turn press (rad)
+const TURN_BURST_BANK := 0.025         # bank snap per frame on initial turn press (rad)
 const TURN_BURST_FRAMES := 5           # number of frames the burst lasts
-const TURN_BURST_ACCEL_FACTOR := 0.5   # lateral accel multiplier during burst — carve initiation lag
-const LEAN_FORWARD_ACCEL := 6.0       # extra units/sec while leaning forward
-const LEAN_FORWARD_ANGLE := -0.22     # body tilt in radians (~12.6°)
-const LEAN_FORWARD_LATERAL_MULT := 0.5  # lateral accel/counter-decel multiplier while leaning
-const LEAN_FORWARD_RECOVERY_YAW := 0.05  # tighter recovery threshold while leaning
+const TURN_BURST_ACCEL_FACTOR := 0.5   # lean accel multiplier during burst
 
-const LEAN_BACK_ANGLE := 0.22          # body tilt backward in radians (~12.6°)
-const LEAN_BACK_BRAKE := 8.0           # forward speed reduction per second while braking
-const LEAN_BACK_MAX_REVERSE := 2.0     # max backward speed (m/s)
-const LEAN_BACK_RECOVER_RATE := 10.0   # speed/sec to return to BASE_SPEED after releasing
+const LEAN_FORWARD_ACCEL := 6.0
+const LEAN_FORWARD_ANGLE := -0.22
+const LEAN_FORWARD_LATERAL_MULT := 0.5
+const LEAN_FORWARD_RECOVERY_YAW := 0.05
+const LEAN_BACK_ANGLE := 0.22
+const LEAN_BACK_BRAKE := 8.0
+const LEAN_BACK_MAX_REVERSE := 2.0
+const LEAN_BACK_RECOVER_RATE := 10.0
 
-const RAIL_SPEED_DRAIN := 3.0               # forward speed lost per second while grinding
-const SNOW_TERRAIN_SPEED_DRAIN := 4.0       # forward speed lost per second on any snow obstacle (ramps, moguls, walls)
-const LEAN_FORWARD_MAX_SPEED := 55.0   # boosted max speed while leaning forward
-const LEAN_BOOST_DECAY := 15.0         # m/s per second speed decay after releasing lean
+const RAIL_SPEED_DRAIN := 3.0
+const SNOW_TERRAIN_SPEED_DRAIN := 4.0
+const LEAN_FORWARD_MAX_SPEED := 55.0
+const LEAN_BOOST_DECAY := 15.0
 
-const MIN_TRICK_AIR_TIME := 0.3   # seconds airborne required to register a trick
-const MIN_TRICK_SPIN := 0.8       # radians of yaw required to register a trick (~46°)
-const STOMP_THRESHOLD := PI / 12.0  # 15° — within this of a clean rotation = stomp
-const SLOPPY_SPEED_PENALTY := 15.0  # m/s lost on a sloppy landing
-const WIPEOUT_DURATION := 2.2       # seconds of wipeout before Jerry gets up
-const WIPEOUT_BRAKE_RATE := 40.0    # m/s² braking during wipeout
+const MIN_TRICK_AIR_TIME := 0.3
+const MIN_TRICK_SPIN := 0.8
+const STOMP_THRESHOLD := PI / 12.0
+const SLOPPY_SPEED_PENALTY := 15.0
+const WIPEOUT_DURATION := 2.2
+const WIPEOUT_BRAKE_RATE := 40.0
+
+# Board direction / lean split
+const BOARD_TURN_SPEED := 1.0       # rad/s board yaw rotation on ground (arrows)
+const BOARD_TURN_MAX := 0.35        # max board yaw offset from forward (~20°)
+const BOARD_TURN_RETURN := 3.0      # rad/s return-to-center when no turn input
+const CONFLICT_WIPEOUT_TIME := 0.28 # seconds of opposing lean+turn before wipeout
+const CONFLICT_MIN_SPEED := 14.0    # minimum speed for conflict wipeout
 
 signal stance_changed(goofy: bool)
 
@@ -53,8 +62,8 @@ var _air_spin_y: float = 0.0
 var _air_time: float = 0.0
 var _is_wiping_out: bool = false
 var _wipeout_timer: float = 0.0
-var _rail_spin_acc: float = 0.0   # absolute yaw accumulated this grind
-var _rail_tricks: int = 0         # 180s awarded this grind
+var _rail_spin_acc: float = 0.0
+var _rail_tricks: int = 0
 var _was_on_rail: bool = false
 var _was_on_snow: bool = false
 var _boost_multiplier: float = 1.0
@@ -67,6 +76,10 @@ var _is_leaning_fwd: bool = false
 var _is_leaning_back: bool = false
 var _turn_burst_frames: int = 0
 var _turn_burst_dir: float = 0.0
+
+var _board_yaw: float = 0.0    # board facing angle offset from world forward (rad, + = right)
+var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
+var _conflict_timer: float = 0.0
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 @onready var snowboard_mesh: MeshInstance3D = $SnowboardMesh
@@ -92,13 +105,20 @@ func _physics_process(delta: float) -> void:
 	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
 	_is_leaning_back = is_on_floor() and Input.is_action_pressed("lean_back") and not _is_leaning_fwd
 
-	_handle_lateral(delta)
+	_handle_lean(delta)
+	_handle_board_turn(delta)
 	_handle_jump()
 	_handle_rail_lock(delta)
 	_apply_gravity(delta)
 
-	velocity.z = -GameManager.current_speed
+	# Compose movement vector from board direction + lean lateral bias
+	var board_vel_x := sin(_board_yaw) * GameManager.current_speed
+	velocity.x = board_vel_x + _lean_vel_x
+	velocity.z = -cos(_board_yaw) * GameManager.current_speed
 	move_and_slide()
+
+	# Recover lean contribution after collision response
+	_lean_vel_x = velocity.x - sin(_board_yaw) * GameManager.current_speed
 
 	if not is_on_floor():
 		_air_time += delta
@@ -110,12 +130,14 @@ func _physics_process(delta: float) -> void:
 	_handle_lean_back(delta)
 	_handle_snow_terrain_drag(delta)
 	_tick_boost(delta)
+	_handle_conflict_check(delta)
 
 	if not _is_leaning_fwd and is_on_floor() and GameManager.current_speed > GameManager.MAX_SPEED:
 		GameManager.current_speed = maxf(GameManager.current_speed - LEAN_BOOST_DECAY * delta, GameManager.MAX_SPEED)
 
-	var lateral_input := Input.get_axis("move_left", "move_right")
-	GameManager.ramp_multiplier = 1.0 if abs(lateral_input) > 0.1 else GameManager.STRAIGHT_RAMP_MULT
+	var turn_input := Input.get_axis("move_left", "move_right")
+	var lean_input := Input.get_axis("lean_left", "lean_right")
+	GameManager.ramp_multiplier = 1.0 if (abs(turn_input) > 0.1 or abs(lean_input) > 0.1) else GameManager.STRAIGHT_RAMP_MULT
 
 	var on_rail := _is_on_rail()
 	_spark_particles.emitting = on_rail
@@ -123,7 +145,6 @@ func _physics_process(delta: float) -> void:
 		SfxManager.set_grinding(on_rail)
 		_was_on_rail = on_rail
 
-	# Snow cloud: continuous when recovering or braking, one-shot burst on landing
 	var want_continuous_snow := (_yaw_recovery or _is_leaning_back) and is_on_floor()
 	if want_continuous_snow:
 		if _snow_particles.one_shot:
@@ -139,10 +160,9 @@ func _physics_process(delta: float) -> void:
 		_fall_off()
 		return
 
-	# Smooth velocity for visuals — filters out rapid physics jitter
 	_smooth_vel_x = lerpf(_smooth_vel_x, velocity.x, 10.0 * delta)
 
-	# Visual tilt and yaw — velocity-based on ground, spin-based in air
+	# Visual tilt and yaw — lean (A/D) drives body roll, turn (arrows) drives board yaw
 	if is_instance_valid(mesh_pivot):
 		if not _is_leaning_fwd and not _is_leaning_back and not _is_on_rail():
 			if Input.is_action_just_pressed("move_right"):
@@ -156,7 +176,7 @@ func _physics_process(delta: float) -> void:
 				mesh_pivot.rotation.y -= _turn_burst_dir * TURN_BURST_YAW
 				_turn_burst_frames -= 1
 
-		var lean_target := -lateral_input * 0.28 - _smooth_vel_x * 0.008
+		var lean_target := -lean_input * 0.28 - _lean_vel_x * 0.016
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
 		var pitch_target := 0.0
 		if _is_leaning_fwd:
@@ -170,7 +190,7 @@ func _physics_process(delta: float) -> void:
 		if is_on_floor():
 			if not _is_on_rail():
 				var stance_offset := PI if is_goofy else 0.0
-				var ground_yaw := stance_offset - _smooth_vel_x * 0.05
+				var ground_yaw := stance_offset - _board_yaw
 				var recovery_yaw_min := LEAN_FORWARD_RECOVERY_YAW if _is_leaning_fwd else RECOVERY_YAW_MIN
 				if _yaw_recovery:
 					var yaw_diff := absf(mesh_pivot.rotation.y - ground_yaw)
@@ -183,35 +203,65 @@ func _physics_process(delta: float) -> void:
 				else:
 					mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, ground_yaw, 10.0 * delta)
 		elif _yaw_recovery:
-			# Became airborne mid-recovery — cancel cleanly
 			_end_recovery()
 
 	ScoreManager.add_distance(GameManager.current_speed * delta)
 
 
-func _handle_lateral(delta: float) -> void:
-	if not is_on_floor():
-		return
-	var input := Input.get_axis("move_left", "move_right")
+# A/D: lean body, biases lateral velocity
+func _handle_lean(delta: float) -> void:
+	var input := Input.get_axis("lean_left", "lean_right")
 	var accel_mult := _boost_multiplier
 	var lean_mult := LEAN_FORWARD_LATERAL_MULT if _is_leaning_fwd else 1.0
 	var carve_mult := TURN_BURST_ACCEL_FACTOR if (_turn_burst_frames > 0 and not _is_leaning_fwd) else 1.0
-	var speed_ratio := clampf(GameManager.current_speed / 10.0, 0.0, 1.0)
-	var effective_max_lateral := lerpf(1.0, max_lateral_speed, speed_ratio)
-	if input != 0.0:
-		if velocity.x * input < 0.0:
-			velocity.x = move_toward(velocity.x, 0.0, lateral_counter_decel * accel_mult * lean_mult * delta)
+	if not is_on_floor():
+		# Slight lateral influence in air
+		if input != 0.0:
+			_lean_vel_x = clampf(_lean_vel_x + input * AIR_LEAN_FORCE * delta, -lean_max_lateral, lean_max_lateral)
 		else:
-			velocity.x = clampf(velocity.x + input * lateral_accel * accel_mult * lean_mult * carve_mult * delta, -effective_max_lateral, effective_max_lateral)
+			_lean_vel_x = move_toward(_lean_vel_x, 0.0, lateral_friction * 0.4 * delta)
+		return
+	if input != 0.0:
+		if _lean_vel_x * input < 0.0:
+			_lean_vel_x = move_toward(_lean_vel_x, 0.0, lateral_counter_decel * accel_mult * lean_mult * delta)
+		else:
+			_lean_vel_x = clampf(_lean_vel_x + input * lateral_accel * accel_mult * lean_mult * carve_mult * delta, -lean_max_lateral, lean_max_lateral)
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, lateral_friction * accel_mult * delta)
+		_lean_vel_x = move_toward(_lean_vel_x, 0.0, lateral_friction * accel_mult * delta)
+
+
+# Left/Right arrows: rotate board direction, changes movement vector
+func _handle_board_turn(delta: float) -> void:
+	if not is_on_floor():
+		return
+	var input := Input.get_axis("move_left", "move_right")
+	if input != 0.0:
+		_board_yaw = clampf(_board_yaw + input * BOARD_TURN_SPEED * delta, -BOARD_TURN_MAX, BOARD_TURN_MAX)
+	else:
+		_board_yaw = move_toward(_board_yaw, 0.0, BOARD_TURN_RETURN * delta)
+
+
+# Wipeout if lean and turn are held in opposing directions
+func _handle_conflict_check(delta: float) -> void:
+	if not is_on_floor() or GameManager.current_speed < CONFLICT_MIN_SPEED:
+		_conflict_timer = 0.0
+		return
+	var lean_input := Input.get_axis("lean_left", "lean_right")
+	var turn_input := Input.get_axis("move_left", "move_right")
+	if lean_input * turn_input < -0.09:  # both > ~0.3 in opposing directions
+		_conflict_timer += delta
+		if _conflict_timer >= CONFLICT_WIPEOUT_TIME:
+			_conflict_timer = 0.0
+			_start_wipeout()
+	else:
+		_conflict_timer = move_toward(_conflict_timer, 0.0, delta * 2.0)
 
 
 func _handle_jump() -> void:
 	if is_on_floor() and Input.is_action_just_pressed("jump"):
 		velocity.y = jump_velocity
 		if _is_on_rail() or abs(get_floor_normal().x) > 0.2:
-			var dir := Input.get_axis("move_left", "move_right")
+			var dir := Input.get_axis("lean_left", "lean_right")
 			velocity.x = dir * max_lateral_speed * 0.7
 
 
@@ -227,6 +277,7 @@ func _apply_wall_gravity(delta: float) -> void:
 		velocity.x -= sign(position.x) * wall_gravity * delta
 
 
+# Arrows spin in air (tricks); A/D lateral drift handled in _handle_lean
 func _handle_air_spin(delta: float) -> void:
 	var on_rail := _is_on_rail()
 	if is_on_floor() and not on_rail:
@@ -234,7 +285,7 @@ func _handle_air_spin(delta: float) -> void:
 		_rail_tricks = 0
 		return
 	var input := Input.get_axis("move_left", "move_right")
-	var spin_delta := input * AIR_SPIN_SPEED * delta
+	var spin_delta := input * AIR_TURN_SPEED * delta
 	_air_spin_y -= spin_delta
 	if on_rail:
 		_rail_spin_acc += absf(spin_delta)
@@ -258,7 +309,7 @@ func _handle_landing() -> void:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
 			var overshoot := absf(spin - nearest_n * PI)
 			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
-			var crash_threshold := lerpf(deg_to_rad(75.0), PI / 4.0, speed_ratio)  # 75° at low speed, 45° at max
+			var crash_threshold := lerpf(deg_to_rad(75.0), PI / 4.0, speed_ratio)
 			if overshoot >= crash_threshold:
 				_air_spin_y = 0.0
 				_air_time = 0.0
@@ -272,15 +323,13 @@ func _handle_landing() -> void:
 				GameManager.current_speed = maxf(GameManager.current_speed - SLOPPY_SPEED_PENALTY, GameManager.BASE_SPEED)
 			else:
 				ScoreManager.add_trick(true)
-		# Normalize mesh to within PI of the post-landing stance so recovery lerps the short way
 		var stance_after := PI if is_goofy else 0.0
 		if is_instance_valid(mesh_pivot):
 			mesh_pivot.rotation.y = stance_after + wrapf(mesh_pivot.rotation.y - stance_after, -PI, PI)
-		# Residual = how far off the nearest valid orientation (any PI multiple)
 		var residual := wrapf(_air_spin_y, -PI, PI)
 		if abs(residual) > RECOVERY_YAW_MIN:
 			_yaw_recovery = true
-			velocity.x = clampf(sin(residual) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
+			_lean_vel_x = clampf(sin(residual) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
 		if abs(residual) >= BOOST_THRESHOLD:
 			_boost_multiplier = BOOST_AMOUNT
 			_boost_timer = BOOST_DURATION
@@ -344,10 +393,10 @@ func _handle_snow_terrain_drag(delta: float) -> void:
 
 
 func _handle_rail_lock(delta: float) -> void:
-	# Grinding: lock lateral position; jump or lean-forward releases it
 	if not _is_on_rail() or velocity.y > 0.0 or _is_leaning_fwd:
 		return
 	velocity.x = 0.0
+	_lean_vel_x = 0.0
 	GameManager.current_speed = maxf(GameManager.current_speed - RAIL_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
 
 
@@ -357,7 +406,6 @@ func _handle_lean_back(delta: float) -> void:
 	if _is_leaning_back:
 		GameManager.current_speed = maxf(GameManager.current_speed - LEAN_BACK_BRAKE * delta, -LEAN_BACK_MAX_REVERSE)
 	elif GameManager.current_speed < GameManager.BASE_SPEED:
-		# Quick ramp back up after releasing
 		GameManager.current_speed = minf(GameManager.current_speed + LEAN_BACK_RECOVER_RATE * delta, GameManager.BASE_SPEED)
 
 
@@ -369,6 +417,9 @@ func _start_wipeout() -> void:
 	_boost_timer = 0.0
 	_was_on_rail = false
 	_was_on_snow = false
+	_board_yaw = 0.0
+	_lean_vel_x = 0.0
+	_conflict_timer = 0.0
 	is_goofy = false
 	stance_changed.emit(false)
 	SfxManager.set_grinding(false)
@@ -389,15 +440,12 @@ func _handle_wipeout(delta: float) -> void:
 	if is_instance_valid(mesh_pivot):
 		var t := 1.0 - (_wipeout_timer / WIPEOUT_DURATION)
 		if t < 0.35:
-			# Tumble — pitch forward hard with oscillating roll
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -1.3, 12.0 * delta)
 			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, sin(_wipeout_timer * 14.0) * 0.7, 8.0 * delta)
 		elif t < 0.75:
-			# Sliding flat
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -PI / 2.0, 5.0 * delta)
 			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
 		else:
-			# Getting up
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, 0.0, 5.0 * delta)
 			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
 			mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, 0.0, 5.0 * delta)
@@ -437,7 +485,7 @@ func _make_spark_particles() -> GPUParticles3D:
 	p.amount = 20
 	p.lifetime = 0.3
 	p.emitting = false
-	p.local_coords = false  # particles fly off in world space
+	p.local_coords = false
 
 	var proc := ParticleProcessMaterial.new()
 	proc.direction = Vector3(0.0, 1.0, 0.0)
@@ -479,7 +527,7 @@ func _make_snow_particles() -> GPUParticles3D:
 
 	var proc := ParticleProcessMaterial.new()
 	proc.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
-	proc.emission_ring_axis = Vector3(0.0, 1.0, 0.0)  # ring lies flat on XZ
+	proc.emission_ring_axis = Vector3(0.0, 1.0, 0.0)
 	proc.emission_ring_radius = 0.35
 	proc.emission_ring_inner_radius = 0.1
 	proc.emission_ring_height = 0.05
@@ -490,7 +538,7 @@ func _make_snow_particles() -> GPUParticles3D:
 	proc.gravity = Vector3(0.0, -5.0, 0.0)
 	proc.scale_min = 1.2
 	proc.scale_max = 2.8
-	proc.color = Color(1.0, 1.0, 1.0, 0.85)  # white
+	proc.color = Color(1.0, 1.0, 1.0, 0.85)
 	p.process_material = proc
 
 	var mesh := QuadMesh.new()
@@ -526,6 +574,9 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_boost_timer = 0.0
 		_was_on_floor = false
 		_smooth_vel_x = 0.0
+		_board_yaw = 0.0
+		_lean_vel_x = 0.0
+		_conflict_timer = 0.0
 		_spark_particles.emitting = false
 		_snow_particles.emitting = false
 		_snow_particles.one_shot = true
