@@ -15,7 +15,7 @@ metallic_specular = 1.0
 roughness = 0.05
 
 [sub_resource type="BoxMesh" id="BoxMesh_boarder"]
-size = Vector3(0.6, 1.0, 0.3)
+size = Vector3(0.3, 1.0, 0.6)
 material = SubResource("Mat_jerry")
 
 [sub_resource type="StandardMaterial3D" id="Mat_board"]
