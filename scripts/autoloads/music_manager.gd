@@ -5,29 +5,34 @@ var _game_player: AudioStreamPlayer
 var _death_player: AudioStreamPlayer
 
 const GAMEPLAY_SONGS: Array[String] = [
-	"res://assets/audio/KRAZYKRAZY.mp3",
-	"res://assets/audio/osmanthus danger.mp3",
-	"res://assets/audio/decimba.mp3",
+	"res://assets/audio/music/KRAZYKRAZY.mp3",
+	"res://assets/audio/music/osmanthus danger.mp3",
+	"res://assets/audio/music/decimba.mp3",
 ]
+
+const VOLUME_DB := -3.1
 
 var _song_queue: Array[String] = []
 
 
 func _ready() -> void:
-	var menu_stream := load("res://assets/audio/purplepinkcannon - menu.mp3") as AudioStreamMP3
+	var menu_stream := load("res://assets/audio/music/purplepinkcannon - menu.mp3") as AudioStreamMP3
 	menu_stream.loop = true
 	_menu_player = AudioStreamPlayer.new()
 	_menu_player.stream = menu_stream
+	_menu_player.volume_db = VOLUME_DB
 	add_child(_menu_player)
 
 	_game_player = AudioStreamPlayer.new()
+	_game_player.volume_db = VOLUME_DB
 	add_child(_game_player)
 	_game_player.finished.connect(_play_random_gameplay_song)
 
-	var death_stream := load("res://assets/audio/deathscreen.mp3") as AudioStreamMP3
+	var death_stream := load("res://assets/audio/music/deathscreen.mp3") as AudioStreamMP3
 	death_stream.loop = true
 	_death_player = AudioStreamPlayer.new()
 	_death_player.stream = death_stream
+	_death_player.volume_db = VOLUME_DB
 	add_child(_death_player)
 
 	GameManager.state_changed.connect(_on_state_changed)

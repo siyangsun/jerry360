@@ -52,6 +52,8 @@ var _is_wiping_out: bool = false
 var _wipeout_timer: float = 0.0
 var _rail_spin_acc: float = 0.0   # absolute yaw accumulated this grind
 var _rail_tricks: int = 0         # 180s awarded this grind
+var _was_on_rail: bool = false
+var _was_on_snow: bool = false
 var _boost_multiplier: float = 1.0
 var _boost_timer: float = 0.0
 var _smooth_vel_x: float = 0.0
@@ -112,7 +114,11 @@ func _physics_process(delta: float) -> void:
 	var lateral_input := Input.get_axis("move_left", "move_right")
 	GameManager.ramp_multiplier = 1.0 if abs(lateral_input) > 0.1 else GameManager.STRAIGHT_RAMP_MULT
 
-	_spark_particles.emitting = _is_on_rail()
+	var on_rail := _is_on_rail()
+	_spark_particles.emitting = on_rail
+	if on_rail != _was_on_rail:
+		SfxManager.set_grinding(on_rail)
+		_was_on_rail = on_rail
 
 	# Snow cloud: continuous when recovering or braking, one-shot burst on landing
 	var want_continuous_snow := (_yaw_recovery or _is_leaning_back) and is_on_floor()
@@ -239,6 +245,7 @@ func _handle_air_spin(delta: float) -> void:
 func _handle_landing() -> void:
 	var on_floor := is_on_floor()
 	if on_floor and not _was_on_floor:
+		SfxManager.play_landing()
 		if not _is_on_rail():
 			_snow_particles.restart()
 		var spin := absf(_air_spin_y)
@@ -265,6 +272,8 @@ func _handle_landing() -> void:
 			_boost_timer = BOOST_DURATION
 		_air_spin_y = 0.0
 		_air_time = 0.0
+	elif not on_floor and _was_on_floor:
+		SfxManager.play_airborne()
 	_was_on_floor = on_floor
 
 
@@ -302,13 +311,16 @@ func _handle_lean_forward(delta: float) -> void:
 
 
 func _handle_snow_terrain_drag(delta: float) -> void:
-	if not is_on_floor() or _is_on_rail():
-		return
-	for i in get_slide_collision_count():
-		var col := get_slide_collision(i)
-		if col.get_collider() != null and col.get_collider().is_in_group("snow_terrain"):
-			GameManager.current_speed = maxf(GameManager.current_speed - SNOW_TERRAIN_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
-			return
+	var on_snow := is_on_floor() and not _is_on_rail()
+	if on_snow:
+		for i in get_slide_collision_count():
+			var col := get_slide_collision(i)
+			if col.get_collider() != null and col.get_collider().is_in_group("snow_terrain"):
+				GameManager.current_speed = maxf(GameManager.current_speed - SNOW_TERRAIN_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
+				break
+	if on_snow != _was_on_snow:
+		SfxManager.set_on_snow(on_snow)
+		_was_on_snow = on_snow
 
 
 func _handle_rail_lock(delta: float) -> void:
@@ -335,6 +347,10 @@ func _start_wipeout() -> void:
 	_yaw_recovery = false
 	_boost_multiplier = 1.0
 	_boost_timer = 0.0
+	_was_on_rail = false
+	_was_on_snow = false
+	SfxManager.set_grinding(false)
+	SfxManager.set_on_snow(false)
 	ScoreManager.reset_combo()
 	_snow_particles.restart()
 
@@ -480,6 +496,8 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_wipeout_timer = 0.0
 		_rail_spin_acc = 0.0
 		_rail_tricks = 0
+		_was_on_rail = false
+		_was_on_snow = false
 		_boost_multiplier = 1.0
 		_boost_timer = 0.0
 		_was_on_floor = false
