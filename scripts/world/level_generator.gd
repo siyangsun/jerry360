@@ -39,6 +39,16 @@ const MOGULS_PER_FIELD_MIN := 5
 const MOGULS_PER_FIELD_MAX := 10
 const MOGUL_FIELD_SPREAD_Z := 16.0
 
+# Trees
+const TREE_TRUNK_RADIUS := 0.30
+const TREE_TRUNK_HEIGHT := 2.4
+const TREE_FOLIAGE_RADIUS := 1.6
+const TREE_FOLIAGE_HEIGHT := 5.6
+const TREE_SPAWN_CHANCE := 0.10
+const TREE_CLUSTER_SPREAD := 6.0
+const TREE_COLOR_FOLIAGE := Color(0.05, 0.28, 0.05)
+const TREE_COLOR_TRUNK := Color(0.22, 0.12, 0.05)
+
 # Rails
 const RAIL_SPAWN_CHANCE := 0.25   # checked first — rails are rarer than ramps
 const RAIL_WIDTH_VISUAL := 0.25
@@ -143,14 +153,18 @@ func _maybe_add_obstacles(root: Node3D) -> void:
 	var z := -RAMP_MARGIN
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
-		if roll < RAIL_SPAWN_CHANCE:
-			var length := randf_range(RAIL_LENGTH_MIN, RAIL_LENGTH_MAX)  # long enough for on+off ramps plus flat section
+		if roll < TREE_SPAWN_CHANCE:
+			var max_offset := FLOOR_WIDTH * 0.5 - TREE_FOLIAGE_RADIUS - 0.5
+			var tx := randf_range(-max_offset, max_offset)
+			root.add_child(_make_tree_cluster(Vector3(tx, 0.0, z)))
+		elif roll < TREE_SPAWN_CHANCE + RAIL_SPAWN_CHANCE:
+			var length := randf_range(RAIL_LENGTH_MIN, RAIL_LENGTH_MAX)
 			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
-		elif roll < RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE:
+		elif roll < TREE_SPAWN_CHANCE + RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE:
 			root.add_child(_make_mogul_field(Vector3(0.0, 0.0, z)))
-		elif roll < RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE + RAMP_SPAWN_CHANCE:
+		elif roll < TREE_SPAWN_CHANCE + RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE + RAMP_SPAWN_CHANCE:
 			var max_offset := FLOOR_WIDTH * 0.5 - RAMP_WIDTH * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
@@ -409,6 +423,67 @@ func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+func _make_tree_cluster(center: Vector3) -> Node3D:
+	var cluster := Node3D.new()
+	cluster.position = center
+	var count := randi_range(1, 7)
+	for i in range(count):
+		var ox := randf_range(-TREE_CLUSTER_SPREAD, TREE_CLUSTER_SPREAD)
+		var oz := randf_range(-TREE_CLUSTER_SPREAD, TREE_CLUSTER_SPREAD)
+		cluster.add_child(_make_tree(Vector3(ox, 0.0, oz)))
+	return cluster
+
+
+func _make_tree(pos: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+
+	# Trunk — skinny triangular prism
+	var trunk_mat := StandardMaterial3D.new()
+	trunk_mat.albedo_color = TREE_COLOR_TRUNK
+	var trunk_cyl := CylinderMesh.new()
+	trunk_cyl.top_radius = TREE_TRUNK_RADIUS
+	trunk_cyl.bottom_radius = TREE_TRUNK_RADIUS
+	trunk_cyl.height = TREE_TRUNK_HEIGHT
+	trunk_cyl.radial_segments = 3
+	var trunk_mesh := MeshInstance3D.new()
+	trunk_mesh.mesh = trunk_cyl
+	trunk_mesh.material_override = trunk_mat
+	trunk_mesh.position.y = TREE_TRUNK_HEIGHT * 0.5
+	root.add_child(trunk_mesh)
+
+	# Foliage — pointy triangular pyramid (top_radius = 0)
+	var foliage_mat := StandardMaterial3D.new()
+	foliage_mat.albedo_color = TREE_COLOR_FOLIAGE
+	var foliage_cyl := CylinderMesh.new()
+	foliage_cyl.top_radius = 0.0
+	foliage_cyl.bottom_radius = TREE_FOLIAGE_RADIUS
+	foliage_cyl.height = TREE_FOLIAGE_HEIGHT
+	foliage_cyl.radial_segments = 3
+	var foliage_mesh := MeshInstance3D.new()
+	foliage_mesh.mesh = foliage_cyl
+	foliage_mesh.material_override = foliage_mat
+	foliage_mesh.position.y = TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT * 0.5
+	root.add_child(foliage_mesh)
+
+	# Crash area — covers the whole tree height
+	var area := Area3D.new()
+	var area_col := CollisionShape3D.new()
+	var area_shape := CylinderShape3D.new()
+	area_shape.radius = TREE_TRUNK_RADIUS + 0.15
+	area_shape.height = TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT
+	area_col.shape = area_shape
+	area_col.position.y = (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5
+	area.add_child(area_col)
+	area.body_entered.connect(func(body: Node3D) -> void:
+		if body.has_method("crash"):
+			body.crash()
+	)
+	root.add_child(area)
+
+	return root
 
 
 func _make_lap_marker() -> MeshInstance3D:

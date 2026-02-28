@@ -302,6 +302,12 @@ func _tick_boost(delta: float) -> void:
 		_boost_multiplier = lerpf(1.0, BOOST_AMOUNT, _boost_timer / BOOST_DURATION)
 
 
+func crash() -> void:
+	if _is_dead or _is_wiping_out:
+		return
+	_start_wipeout()
+
+
 func _fall_off() -> void:
 	if _is_dead:
 		return
