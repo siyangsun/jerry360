@@ -354,6 +354,7 @@ func _tick_boost(delta: float) -> void:
 func crash() -> void:
 	if _is_dead or _is_wiping_out:
 		return
+	SfxManager.play_landing()
 	_start_wipeout()
 
 

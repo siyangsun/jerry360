@@ -4,6 +4,7 @@ var _grind_player: AudioStreamPlayer
 var _snow_player: AudioStreamPlayer
 var _land_player: AudioStreamPlayer
 var _air_player: AudioStreamPlayer
+var _collide_player: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -31,6 +32,12 @@ func _ready() -> void:
 	_air_player.stream = air_stream
 	add_child(_air_player)
 
+	var collide_stream := load("res://assets/audio/sfx/collide.mp3") as AudioStreamMP3
+	collide_stream.loop = false
+	_collide_player = AudioStreamPlayer.new()
+	_collide_player.stream = collide_stream
+	add_child(_collide_player)
+
 	GameManager.state_changed.connect(_on_state_changed)
 
 
@@ -56,9 +63,14 @@ func play_airborne() -> void:
 	_air_player.play()
 
 
+func play_collide() -> void:
+	_collide_player.play()
+
+
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state != GameManager.State.PLAYING:
 		_grind_player.stop()
 		_snow_player.stop()
 		_land_player.stop()
 		_air_player.stop()
+		_collide_player.stop()
