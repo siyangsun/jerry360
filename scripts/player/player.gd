@@ -8,7 +8,7 @@ extends CharacterBody3D
 @export var gravity := 24.0
 @export var wall_gravity := 18.0
 
-const AIR_SPIN_SPEED := 2.0    # rad/s of yaw input can apply in air
+const AIR_SPIN_SPEED := 2.6    # rad/s of yaw input can apply in air
 const BOOST_AMOUNT := 2.0      # multiplier on accel/decel after landing trick
 const BOOST_DURATION := 1.5    # seconds the boost lasts
 const BOOST_THRESHOLD := 0.15  # minimum air spin (rad) to earn a boost
@@ -37,9 +37,21 @@ const SNOW_TERRAIN_SPEED_DRAIN := 4.0       # forward speed lost per second on a
 const LEAN_FORWARD_MAX_SPEED := 55.0   # boosted max speed while leaning forward
 const LEAN_BOOST_DECAY := 15.0         # m/s per second speed decay after releasing lean
 
+const MIN_TRICK_AIR_TIME := 0.3   # seconds airborne required to register a trick
+const MIN_TRICK_SPIN := 0.8       # radians of yaw required to register a trick (~46°)
+const STOMP_THRESHOLD := PI / 12.0  # 15° — within this of a clean rotation = stomp
+const SLOPPY_SPEED_PENALTY := 15.0  # m/s lost on a sloppy landing
+const WIPEOUT_DURATION := 2.2       # seconds of wipeout before Jerry gets up
+const WIPEOUT_BRAKE_RATE := 40.0    # m/s² braking during wipeout
+
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
+var _air_time: float = 0.0
+var _is_wiping_out: bool = false
+var _wipeout_timer: float = 0.0
+var _rail_spin_acc: float = 0.0   # absolute yaw accumulated this grind
+var _rail_tricks: int = 0         # 180s awarded this grind
 var _boost_multiplier: float = 1.0
 var _boost_timer: float = 0.0
 var _smooth_vel_x: float = 0.0
@@ -68,6 +80,10 @@ func _physics_process(delta: float) -> void:
 	if _is_dead or GameManager.state != GameManager.State.PLAYING:
 		return
 
+	if _is_wiping_out:
+		_handle_wipeout(delta)
+		return
+
 	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
 	_is_leaning_back = is_on_floor() and Input.is_action_pressed("lean_back") and not _is_leaning_fwd
 
@@ -78,6 +94,9 @@ func _physics_process(delta: float) -> void:
 
 	velocity.z = -GameManager.current_speed
 	move_and_slide()
+
+	if not is_on_floor():
+		_air_time += delta
 
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
@@ -199,10 +218,20 @@ func _apply_wall_gravity(delta: float) -> void:
 
 
 func _handle_air_spin(delta: float) -> void:
-	if is_on_floor() and not _is_on_rail():
+	var on_rail := _is_on_rail()
+	if is_on_floor() and not on_rail:
+		_rail_spin_acc = 0.0
+		_rail_tricks = 0
 		return
 	var input := Input.get_axis("move_left", "move_right")
-	_air_spin_y -= input * AIR_SPIN_SPEED * delta
+	var spin_delta := input * AIR_SPIN_SPEED * delta
+	_air_spin_y -= spin_delta
+	if on_rail:
+		_rail_spin_acc += absf(spin_delta)
+		var earned := int(_rail_spin_acc / PI)
+		if earned > _rail_tricks:
+			_rail_tricks = earned
+			ScoreManager.add_trick(false)
 	if is_instance_valid(mesh_pivot):
 		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, _air_spin_y, 8.0 * delta)
 
@@ -212,6 +241,22 @@ func _handle_landing() -> void:
 	if on_floor and not _was_on_floor:
 		if not _is_on_rail():
 			_snow_particles.restart()
+		var spin := absf(_air_spin_y)
+		if _air_time >= MIN_TRICK_AIR_TIME and spin >= MIN_TRICK_SPIN:
+			var nearest_n := maxf(1.0, roundf(spin / PI))
+			var overshoot := absf(spin - nearest_n * PI)
+			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
+			var crash_threshold := lerpf(deg_to_rad(75.0), PI / 4.0, speed_ratio)  # 75° at low speed, 45° at max
+			if overshoot >= crash_threshold:
+				_air_spin_y = 0.0
+				_air_time = 0.0
+				_start_wipeout()
+				_was_on_floor = on_floor
+				return
+			elif overshoot >= STOMP_THRESHOLD:
+				GameManager.current_speed = maxf(GameManager.current_speed - SLOPPY_SPEED_PENALTY, GameManager.BASE_SPEED)
+			else:
+				ScoreManager.add_trick(true)
 		if abs(_air_spin_y) > RECOVERY_YAW_MIN:
 			_yaw_recovery = true
 			velocity.x = clampf(sin(_air_spin_y) * GameManager.current_speed * RECOVERY_LATERAL_FACTOR, -max_lateral_speed, max_lateral_speed)
@@ -219,6 +264,7 @@ func _handle_landing() -> void:
 			_boost_multiplier = BOOST_AMOUNT
 			_boost_timer = BOOST_DURATION
 		_air_spin_y = 0.0
+		_air_time = 0.0
 	_was_on_floor = on_floor
 
 
@@ -281,6 +327,57 @@ func _handle_lean_back(delta: float) -> void:
 	elif GameManager.current_speed < GameManager.BASE_SPEED:
 		# Quick ramp back up after releasing
 		GameManager.current_speed = minf(GameManager.current_speed + LEAN_BACK_RECOVER_RATE * delta, GameManager.BASE_SPEED)
+
+
+func _start_wipeout() -> void:
+	_is_wiping_out = true
+	_wipeout_timer = WIPEOUT_DURATION
+	_yaw_recovery = false
+	_boost_multiplier = 1.0
+	_boost_timer = 0.0
+	ScoreManager.reset_combo()
+	_snow_particles.restart()
+
+
+func _handle_wipeout(delta: float) -> void:
+	_wipeout_timer -= delta
+	GameManager.current_speed = maxf(GameManager.current_speed - WIPEOUT_BRAKE_RATE * delta, 0.0)
+	velocity.z = -GameManager.current_speed
+	velocity.x = move_toward(velocity.x, 0.0, 30.0 * delta)
+	if not is_on_floor():
+		velocity.y -= gravity * delta
+	move_and_slide()
+
+	if is_instance_valid(mesh_pivot):
+		var t := 1.0 - (_wipeout_timer / WIPEOUT_DURATION)
+		if t < 0.35:
+			# Tumble — pitch forward hard with oscillating roll
+			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -1.3, 12.0 * delta)
+			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, sin(_wipeout_timer * 14.0) * 0.7, 8.0 * delta)
+		elif t < 0.75:
+			# Sliding flat
+			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -PI / 2.0, 5.0 * delta)
+			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
+		else:
+			# Getting up
+			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, 0.0, 5.0 * delta)
+			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
+			mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, 0.0, 5.0 * delta)
+
+	if position.y < -50.0:
+		_fall_off()
+		return
+
+	if _wipeout_timer <= 0.0:
+		_end_wipeout()
+
+
+func _end_wipeout() -> void:
+	_is_wiping_out = false
+	_wipeout_timer = 0.0
+	GameManager.current_speed = 0.0
+	if is_instance_valid(mesh_pivot):
+		mesh_pivot.rotation = Vector3.ZERO
 
 
 func _end_recovery() -> void:
@@ -378,6 +475,11 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		velocity = Vector3.ZERO
 		position = Vector3(0.0, 3.0, 0.0)
 		_air_spin_y = 0.0
+		_air_time = 0.0
+		_is_wiping_out = false
+		_wipeout_timer = 0.0
+		_rail_spin_acc = 0.0
+		_rail_tricks = 0
 		_boost_multiplier = 1.0
 		_boost_timer = 0.0
 		_was_on_floor = false

@@ -3,9 +3,16 @@ extends Node
 var distance: float = 0.0
 var high_score: float = 0.0
 var deaths: int = 0
+var combo_count: int = 0
+var combo_multiplier: float = 1.0
+
+const COMBO_MULT_PER_COUNT := 0.25
+const COMBO_MAX_MULTIPLIER := 4.0
 
 signal distance_updated(dist: float)
 signal new_high_score(dist: float)
+signal combo_changed(count: int, multiplier: float)
+signal trick_landed(is_stomp: bool)
 
 
 func _ready() -> void:
@@ -16,14 +23,31 @@ func _ready() -> void:
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.PLAYING:
 		distance = 0.0
+		reset_combo()
 	elif new_state == GameManager.State.DEAD:
 		deaths += 1
+		reset_combo()
 		_check_high_score()
 
 
 func add_distance(delta_dist: float) -> void:
-	distance += delta_dist
+	distance += delta_dist * combo_multiplier
 	distance_updated.emit(distance)
+
+
+func add_trick(is_stomp: bool) -> void:
+	combo_count += 1
+	combo_multiplier = minf(1.0 + combo_count * COMBO_MULT_PER_COUNT, COMBO_MAX_MULTIPLIER)
+	combo_changed.emit(combo_count, combo_multiplier)
+	trick_landed.emit(is_stomp)
+
+
+func reset_combo() -> void:
+	if combo_count == 0:
+		return
+	combo_count = 0
+	combo_multiplier = 1.0
+	combo_changed.emit(combo_count, combo_multiplier)
 
 
 func _check_high_score() -> void:
