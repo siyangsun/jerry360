@@ -8,6 +8,23 @@ extends CharacterBody3D
 @export var jump_velocity := 10.0
 @export var gravity := 24.0
 @export var wall_gravity := 18.0
+@export var air_lean_friction_factor := 0.4   # fraction of lateral_friction applied in air
+@export var rail_jump_lateral_factor := 0.7   # lateral speed fraction when jumping off rail/wall
+@export var conflict_opposing_threshold := 0.09  # |lean×turn| below this = conflict
+@export var conflict_decay_rate := 2.0           # how fast conflict timer drains when not conflicting
+@export var crash_threshold_slow_deg := 75.0     # max overshoot angle (degrees) at base speed
+@export var crash_threshold_fast_deg := 45.0     # max overshoot angle (degrees) at max speed
+@export var wipeout_lateral_decel := 30.0        # lateral decel rate during wipeout slide
+@export var lean_tilt_visual_scale := 0.28       # body roll per unit of lean input
+@export var lean_vel_tilt_visual_scale := 0.016  # body roll per unit of lean velocity
+@export var wall_normal_threshold := 0.2         # floor normal x above this triggers wall physics
+@export var air_spin_lerp_speed := 8.0           # how snappily the mesh follows air spin
+@export var wipeout_danger_dead_zone := 0.05     # min intensity change to emit wipeout_danger signal
+@export var wipeout_fall_pitch := -1.3           # forward pitch angle during wipeout tumble
+@export var wipeout_wobble_freq := 14.0          # wobble oscillation frequency during tumble
+@export var wipeout_wobble_amp := 0.7            # wobble roll amplitude during tumble
+@export var wipeout_phase1_end := 0.35           # t where tumble transitions to flat spin
+@export var wipeout_phase2_end := 0.75           # t where flat spin transitions to recovery
 
 const AIR_TURN_SPEED := 4.0    # rad/s of turn input (arrows) in air — spin/tricks
 const AIR_LEAN_FORCE := 4.0    # lateral accel from lean input (A/D) in air
@@ -185,7 +202,7 @@ func _physics_process(delta: float) -> void:
 				mesh_pivot.rotation.y -= _turn_burst_dir * TURN_BURST_YAW
 				_turn_burst_frames -= 1
 
-		var lean_target := -lean_input * 0.28 - _lean_vel_x * 0.016
+		var lean_target := -lean_input * lean_tilt_visual_scale - _lean_vel_x * lean_vel_tilt_visual_scale
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
 		var pitch_target := 0.0
 		if _is_leaning_fwd:
@@ -228,7 +245,7 @@ func _handle_lean(delta: float) -> void:
 		if input != 0.0:
 			_lean_vel_x = clampf(_lean_vel_x + input * AIR_LEAN_FORCE * delta, -lean_max_lateral, lean_max_lateral)
 		else:
-			_lean_vel_x = move_toward(_lean_vel_x, 0.0, lateral_friction * 0.4 * delta)
+			_lean_vel_x = move_toward(_lean_vel_x, 0.0, lateral_friction * air_lean_friction_factor * delta)
 		return
 	if input != 0.0:
 		if _lean_vel_x * input < 0.0:
@@ -263,7 +280,7 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 	if is_on_floor() and GameManager.current_speed >= CONFLICT_MIN_SPEED and not _is_on_rail():
 		var lean_input := Input.get_axis("lean_left", "lean_right")
 		var turn_input := Input.get_axis("move_left", "move_right")
-		if lean_input * turn_input < -0.09 or (lean_input == 0 and abs(turn_input) > 0):
+		if lean_input * turn_input < -conflict_opposing_threshold or (lean_input == 0 and abs(turn_input) > 0):
 			_conflict_timer += delta
 			if _conflict_timer >= CONFLICT_WIPEOUT_TIME:
 				_conflict_timer = 0.0
@@ -271,7 +288,7 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 				_start_wipeout()
 				return
 		else:
-			_conflict_timer = move_toward(_conflict_timer, 0.0, delta * 2.0)
+			_conflict_timer = move_toward(_conflict_timer, 0.0, delta * conflict_decay_rate)
 		var conflict_intensity := _conflict_timer / CONFLICT_WIPEOUT_TIME
 		if conflict_intensity > best_intensity:
 			best_intensity = conflict_intensity
@@ -286,7 +303,7 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
 			var residual := absf(spin - nearest_n * PI)
 			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
-			var crash_threshold := lerpf(deg_to_rad(75.0), PI / 4.0, speed_ratio)
+			var crash_threshold := lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio)
 			var yaw_intensity := clampf((residual - STOMP_THRESHOLD) / (crash_threshold - STOMP_THRESHOLD), 0.0, 1.0)
 			if yaw_intensity > best_intensity:
 				best_intensity = yaw_intensity
@@ -302,7 +319,7 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 
 
 func _emit_danger(intensity: float, reason: WipeoutReason) -> void:
-	if absf(intensity - _wipeout_danger_intensity) > 0.05 or reason != _wipeout_danger_reason:
+	if absf(intensity - _wipeout_danger_intensity) > wipeout_danger_dead_zone or reason != _wipeout_danger_reason:
 		_wipeout_danger_intensity = intensity
 		_wipeout_danger_reason = reason
 		wipeout_danger.emit(intensity, reason)
@@ -311,9 +328,9 @@ func _emit_danger(intensity: float, reason: WipeoutReason) -> void:
 func _handle_jump() -> void:
 	if is_on_floor() and Input.is_action_just_pressed("jump"):
 		velocity.y = jump_velocity
-		if _is_on_rail() or abs(get_floor_normal().x) > 0.2:
+		if _is_on_rail() or abs(get_floor_normal().x) > wall_normal_threshold:
 			var dir := Input.get_axis("lean_left", "lean_right")
-			velocity.x = dir * max_lateral_speed * 0.7
+			velocity.x = dir * max_lateral_speed * rail_jump_lateral_factor
 
 
 func _apply_gravity(delta: float) -> void:
@@ -324,7 +341,7 @@ func _apply_gravity(delta: float) -> void:
 func _apply_wall_gravity(delta: float) -> void:
 	if not is_on_floor():
 		return
-	if abs(get_floor_normal().x) > 0.2:
+	if abs(get_floor_normal().x) > wall_normal_threshold:
 		velocity.x -= sign(position.x) * wall_gravity * delta
 
 
@@ -346,7 +363,7 @@ func _handle_air_spin(delta: float) -> void:
 			ScoreManager.add_trick(false)
 	if is_instance_valid(mesh_pivot):
 		var stance_offset := PI if is_goofy else 0.0
-		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, stance_offset + _air_spin_y, 8.0 * delta)
+		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, stance_offset + _air_spin_y, air_spin_lerp_speed * delta)
 
 
 func _handle_landing() -> void:
@@ -360,7 +377,7 @@ func _handle_landing() -> void:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
 			var overshoot := absf(spin - nearest_n * PI)
 			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
-			var crash_threshold := lerpf(deg_to_rad(75.0), PI / 4.0, speed_ratio)
+			var crash_threshold := lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio)
 			if overshoot >= crash_threshold:
 				_air_spin_y = 0.0
 				_air_time = 0.0
@@ -495,17 +512,17 @@ func _handle_wipeout(delta: float) -> void:
 	_wipeout_timer -= delta
 	GameManager.current_speed = maxf(GameManager.current_speed - WIPEOUT_BRAKE_RATE * delta, 0.0)
 	velocity.z = -GameManager.current_speed
-	velocity.x = move_toward(velocity.x, 0.0, 30.0 * delta)
+	velocity.x = move_toward(velocity.x, 0.0, wipeout_lateral_decel * delta)
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	move_and_slide()
 
 	if is_instance_valid(mesh_pivot):
 		var t := 1.0 - (_wipeout_timer / WIPEOUT_DURATION)
-		if t < 0.35:
-			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -1.3, 12.0 * delta)
-			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, sin(_wipeout_timer * 14.0) * 0.7, 8.0 * delta)
-		elif t < 0.75:
+		if t < wipeout_phase1_end:
+			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, wipeout_fall_pitch, 12.0 * delta)
+			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, sin(_wipeout_timer * wipeout_wobble_freq) * wipeout_wobble_amp, 8.0 * delta)
+		elif t < wipeout_phase2_end:
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -PI / 2.0, 5.0 * delta)
 			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
 		else:
