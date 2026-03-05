@@ -232,7 +232,7 @@ func _handle_lean(delta: float) -> void:
 
 # Left/Right arrows: rotate board direction, changes movement vector
 func _handle_board_turn(delta: float) -> void:
-	if not is_on_floor():
+	if not is_on_floor() or _is_on_rail():
 		return
 	var input := Input.get_axis("move_left", "move_right")
 	if input != 0.0:
@@ -243,7 +243,7 @@ func _handle_board_turn(delta: float) -> void:
 
 # Wipeout if lean and turn are held in opposing directions, or if you turn without leaning
 func _handle_conflict_check(delta: float) -> void:
-	if not is_on_floor() or GameManager.current_speed < CONFLICT_MIN_SPEED:
+	if not is_on_floor() or GameManager.current_speed < CONFLICT_MIN_SPEED or _is_on_rail():
 		_conflict_timer = 0.0
 		return
 	var lean_input := Input.get_axis("lean_left", "lean_right")
@@ -398,6 +398,7 @@ func _handle_rail_lock(delta: float) -> void:
 		return
 	velocity.x = 0.0
 	_lean_vel_x = 0.0
+	_board_yaw = 0.0
 	GameManager.current_speed = maxf(GameManager.current_speed - RAIL_SPEED_DRAIN * delta, GameManager.BASE_SPEED)
 
 
