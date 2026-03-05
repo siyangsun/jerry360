@@ -45,6 +45,7 @@ const STOMP_THRESHOLD := PI / 12.0
 const SLOPPY_SPEED_PENALTY := 15.0
 const WIPEOUT_DURATION := 2.2
 const WIPEOUT_BRAKE_RATE := 40.0
+const LAND_TILT_WIPEOUT := 3.0    # lean_vel_x magnitude at landing that causes wipeout
 
 # Board direction / lean split
 const BOARD_TURN_SPEED := 1.0       # rad/s board yaw rotation on ground (arrows)
@@ -323,6 +324,12 @@ func _handle_landing() -> void:
 				GameManager.current_speed = maxf(GameManager.current_speed - SLOPPY_SPEED_PENALTY, GameManager.BASE_SPEED)
 			else:
 				ScoreManager.add_trick(true)
+		if _air_time >= MIN_TRICK_AIR_TIME and absf(_lean_vel_x) >= LAND_TILT_WIPEOUT:
+			_air_spin_y = 0.0
+			_air_time = 0.0
+			_start_wipeout()
+			_was_on_floor = on_floor
+			return
 		var stance_after := PI if is_goofy else 0.0
 		if is_instance_valid(mesh_pivot):
 			mesh_pivot.rotation.y = stance_after + wrapf(mesh_pivot.rotation.y - stance_after, -PI, PI)
