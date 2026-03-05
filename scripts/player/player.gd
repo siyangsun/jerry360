@@ -45,7 +45,7 @@ const STOMP_THRESHOLD := PI / 12.0
 const SLOPPY_SPEED_PENALTY := 15.0
 const WIPEOUT_DURATION := 2.2
 const WIPEOUT_BRAKE_RATE := 40.0
-const LAND_TILT_WIPEOUT := 3.0    # lean_vel_x magnitude at landing that causes wipeout
+const LAND_TILT_WIPEOUT := 4.2    # lean_vel_x magnitude at landing that causes wipeout
 
 # Board direction / lean split
 const BOARD_TURN_SPEED := 1.0       # rad/s board yaw rotation on ground (arrows)
@@ -53,10 +53,13 @@ const BOARD_TURN_MAX := 0.35        # max board yaw offset from forward (~20°)
 const BOARD_TURN_RETURN := 3.0      # rad/s return-to-center when no turn input
 const BOARD_TURN_ACCEL := 5.0       # rad/s² ramp-up when pressing turn
 const BOARD_TURN_BRAKE := 9.0       # rad/s² ramp-down when releasing turn
-const CONFLICT_WIPEOUT_TIME := 0.28 # seconds of opposing lean+turn before wipeout
+const CONFLICT_WIPEOUT_TIME := 0.45 # seconds of opposing lean+turn before wipeout
 const CONFLICT_MIN_SPEED := 14.0    # minimum speed for conflict wipeout
 
+enum WipeoutReason { NONE, CONFLICT, AIR_YAW, AIR_TILT }
+
 signal stance_changed(goofy: bool)
+signal wipeout_danger(intensity: float, reason: WipeoutReason)
 
 var is_goofy: bool = false
 var _is_dead: bool = false
@@ -84,6 +87,8 @@ var _board_yaw: float = 0.0    # board facing angle offset from world forward (r
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
 var _conflict_timer: float = 0.0
+var _wipeout_danger_intensity: float = 0.0
+var _wipeout_danger_reason: WipeoutReason = WipeoutReason.NONE
 
 @onready var mesh_pivot: Node3D = $MeshPivot
 @onready var snowboard_mesh: MeshInstance3D = $SnowboardMesh
@@ -134,7 +139,7 @@ func _physics_process(delta: float) -> void:
 	_handle_lean_back(delta)
 	_handle_snow_terrain_drag(delta)
 	_tick_boost(delta)
-	_handle_conflict_check(delta)
+	_evaluate_wipeout_danger(delta)
 
 	if not _is_leaning_fwd and is_on_floor() and GameManager.current_speed > GameManager.MAX_SPEED:
 		GameManager.current_speed = maxf(GameManager.current_speed - LEAN_BOOST_DECAY * delta, GameManager.MAX_SPEED)
@@ -247,20 +252,60 @@ func _handle_board_turn(delta: float) -> void:
 		_board_yaw = move_toward(_board_yaw, 0.0, BOARD_TURN_RETURN * delta)
 
 
-# Wipeout if lean and turn are held in opposing directions, or if you turn without leaning
-func _handle_conflict_check(delta: float) -> void:
-	if not is_on_floor() or GameManager.current_speed < CONFLICT_MIN_SPEED or _is_on_rail():
-		_conflict_timer = 0.0
-		return
-	var lean_input := Input.get_axis("lean_left", "lean_right")
-	var turn_input := Input.get_axis("move_left", "move_right")
-	if lean_input * turn_input < -0.09 or (lean_input == 0 and abs(turn_input) > 0):  # both > ~0.3 in opposing directions
-		_conflict_timer += delta
-		if _conflict_timer >= CONFLICT_WIPEOUT_TIME:
-			_conflict_timer = 0.0
-			_start_wipeout()
+# Consolidated wipeout risk evaluation — computes danger intensity for all self-induced sources
+# and emits wipeout_danger signal. Triggers wipeout when conflict hits 1.0.
+# Landing checks (yaw overshoot, tilt) still fire at the landing moment in _handle_landing.
+func _evaluate_wipeout_danger(delta: float) -> void:
+	var best_intensity := 0.0
+	var best_reason := WipeoutReason.NONE
+
+	# — Conflict danger (ground): yaw without tilt, or opposing lean+turn —
+	if is_on_floor() and GameManager.current_speed >= CONFLICT_MIN_SPEED and not _is_on_rail():
+		var lean_input := Input.get_axis("lean_left", "lean_right")
+		var turn_input := Input.get_axis("move_left", "move_right")
+		if lean_input * turn_input < -0.09 or (lean_input == 0 and abs(turn_input) > 0):
+			_conflict_timer += delta
+			if _conflict_timer >= CONFLICT_WIPEOUT_TIME:
+				_conflict_timer = 0.0
+				_emit_danger(0.0, WipeoutReason.NONE)
+				_start_wipeout()
+				return
+		else:
+			_conflict_timer = move_toward(_conflict_timer, 0.0, delta * 2.0)
+		var conflict_intensity := _conflict_timer / CONFLICT_WIPEOUT_TIME
+		if conflict_intensity > best_intensity:
+			best_intensity = conflict_intensity
+			best_reason = WipeoutReason.CONFLICT
 	else:
-		_conflict_timer = move_toward(_conflict_timer, 0.0, delta * 2.0)
+		_conflict_timer = 0.0
+
+	# — Air yaw danger: live preview of how badly you'd overshoot a clean landing —
+	if not is_on_floor() and _air_time >= MIN_TRICK_AIR_TIME:
+		var spin := absf(_air_spin_y)
+		if spin >= MIN_TRICK_SPIN:
+			var nearest_n := maxf(1.0, roundf(spin / PI))
+			var residual := absf(spin - nearest_n * PI)
+			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
+			var crash_threshold := lerpf(deg_to_rad(75.0), PI / 4.0, speed_ratio)
+			var yaw_intensity := clampf((residual - STOMP_THRESHOLD) / (crash_threshold - STOMP_THRESHOLD), 0.0, 1.0)
+			if yaw_intensity > best_intensity:
+				best_intensity = yaw_intensity
+				best_reason = WipeoutReason.AIR_YAW
+
+		# — Air tilt danger: live preview of landing-tilt wipeout risk —
+		var tilt_intensity := clampf(absf(_lean_vel_x) / LAND_TILT_WIPEOUT, 0.0, 1.0)
+		if tilt_intensity > best_intensity:
+			best_intensity = tilt_intensity
+			best_reason = WipeoutReason.AIR_TILT
+
+	_emit_danger(best_intensity, best_reason)
+
+
+func _emit_danger(intensity: float, reason: WipeoutReason) -> void:
+	if absf(intensity - _wipeout_danger_intensity) > 0.05 or reason != _wipeout_danger_reason:
+		_wipeout_danger_intensity = intensity
+		_wipeout_danger_reason = reason
+		wipeout_danger.emit(intensity, reason)
 
 
 func _handle_jump() -> void:
@@ -435,6 +480,9 @@ func _start_wipeout() -> void:
 	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
+	_wipeout_danger_intensity = 0.0
+	_wipeout_danger_reason = WipeoutReason.NONE
+	wipeout_danger.emit(0.0, WipeoutReason.NONE)
 	is_goofy = false
 	stance_changed.emit(false)
 	SfxManager.set_grinding(false)
@@ -593,6 +641,9 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_board_yaw_vel = 0.0
 		_lean_vel_x = 0.0
 		_conflict_timer = 0.0
+		_wipeout_danger_intensity = 0.0
+		_wipeout_danger_reason = WipeoutReason.NONE
+		wipeout_danger.emit(0.0, WipeoutReason.NONE)
 		_spark_particles.emitting = false
 		_snow_particles.emitting = false
 		_snow_particles.one_shot = true

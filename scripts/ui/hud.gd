@@ -14,6 +14,8 @@ var _next_lap_dist: float = LAP_DISTANCE
 var _combo_label: Label
 var _goofy_label: Label
 var _goofy_time: float = 0.0
+var _danger_label: Label
+var _danger_vignette: ColorRect
 
 
 func _ready() -> void:
@@ -34,11 +36,26 @@ func _ready() -> void:
 	_goofy_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(_goofy_label)
 
+	_danger_vignette = ColorRect.new()
+	_danger_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_danger_vignette.color = Color(1.0, 0.0, 0.0, 0.0)
+	_danger_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_danger_vignette)
+
+	_danger_label = Label.new()
+	_danger_label.visible = false
+	_danger_label.add_theme_font_size_override("font_size", 28)
+	_danger_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_danger_label.position.y = 48
+	_danger_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	add_child(_danger_label)
+
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	GameManager.state_changed.connect(_on_state_changed)
 	var player := get_tree().get_first_node_in_group("player")
 	if player:
 		player.stance_changed.connect(_on_stance_changed)
+		player.wipeout_danger.connect(_on_wipeout_danger)
 	_on_state_changed(GameManager.state)
 
 
@@ -79,6 +96,8 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state != GameManager.State.PLAYING:
 		_combo_label.visible = false
 		_goofy_label.visible = false
+		_danger_label.visible = false
+		_danger_vignette.color.a = 0.0
 
 	if new_state == GameManager.State.PLAYING:
 		_elapsed = 0.0
@@ -96,6 +115,20 @@ func _on_stance_changed(goofy: bool) -> void:
 	_goofy_label.visible = goofy and GameManager.state == GameManager.State.PLAYING
 	if goofy:
 		_goofy_time = 0.0
+
+
+func _on_wipeout_danger(intensity: float, reason: int) -> void:
+	if intensity < 0.25 or GameManager.state != GameManager.State.PLAYING:
+		_danger_label.visible = false
+		_danger_vignette.color.a = 0.0
+		return
+	_danger_label.visible = true
+	match reason:
+		1: _danger_label.text = "WATCH IT"    # CONFLICT
+		2: _danger_label.text = "LAND CLEAN"  # AIR_YAW
+		3: _danger_label.text = "LEVEL OUT"   # AIR_TILT
+	_danger_label.add_theme_color_override("font_color", Color(1.0, 1.0 - intensity, 0.0))
+	_danger_vignette.color = Color(1.0, 0.0, 0.0, intensity * 0.18)
 
 
 func _on_start_pressed() -> void:
