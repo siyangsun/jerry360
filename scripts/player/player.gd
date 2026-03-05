@@ -1,10 +1,10 @@
 extends CharacterBody3D
 
-@export var lateral_accel := 30.0
+@export var lateral_accel := 22.0
 @export var lateral_friction := 16.0
 @export var lateral_counter_decel := 100.0
 @export var max_lateral_speed := 13.0
-@export var lean_max_lateral := 5.0        # max lateral speed contribution from lean (A/D)
+@export var lean_max_lateral := 3.5        # max lateral speed contribution from lean (A/D)
 @export var jump_velocity := 10.0
 @export var gravity := 24.0
 @export var wall_gravity := 18.0
@@ -51,6 +51,8 @@ const LAND_TILT_WIPEOUT := 3.0    # lean_vel_x magnitude at landing that causes 
 const BOARD_TURN_SPEED := 1.0       # rad/s board yaw rotation on ground (arrows)
 const BOARD_TURN_MAX := 0.35        # max board yaw offset from forward (~20°)
 const BOARD_TURN_RETURN := 3.0      # rad/s return-to-center when no turn input
+const BOARD_TURN_ACCEL := 5.0       # rad/s² ramp-up when pressing turn
+const BOARD_TURN_BRAKE := 9.0       # rad/s² ramp-down when releasing turn
 const CONFLICT_WIPEOUT_TIME := 0.28 # seconds of opposing lean+turn before wipeout
 const CONFLICT_MIN_SPEED := 14.0    # minimum speed for conflict wipeout
 
@@ -79,6 +81,7 @@ var _turn_burst_frames: int = 0
 var _turn_burst_dir: float = 0.0
 
 var _board_yaw: float = 0.0    # board facing angle offset from world forward (rad, + = right)
+var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
 var _conflict_timer: float = 0.0
 
@@ -236,9 +239,11 @@ func _handle_board_turn(delta: float) -> void:
 	if not is_on_floor() or _is_on_rail():
 		return
 	var input := Input.get_axis("move_left", "move_right")
-	if input != 0.0:
-		_board_yaw = clampf(_board_yaw + input * BOARD_TURN_SPEED * delta, -BOARD_TURN_MAX, BOARD_TURN_MAX)
-	else:
+	var target_vel := input * BOARD_TURN_SPEED
+	var accel := BOARD_TURN_ACCEL if input != 0.0 else BOARD_TURN_BRAKE
+	_board_yaw_vel = move_toward(_board_yaw_vel, target_vel, accel * delta)
+	_board_yaw = clampf(_board_yaw + _board_yaw_vel * delta, -BOARD_TURN_MAX, BOARD_TURN_MAX)
+	if input == 0.0:
 		_board_yaw = move_toward(_board_yaw, 0.0, BOARD_TURN_RETURN * delta)
 
 
@@ -427,6 +432,7 @@ func _start_wipeout() -> void:
 	_was_on_rail = false
 	_was_on_snow = false
 	_board_yaw = 0.0
+	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
 	is_goofy = false
@@ -584,6 +590,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_was_on_floor = false
 		_smooth_vel_x = 0.0
 		_board_yaw = 0.0
+		_board_yaw_vel = 0.0
 		_lean_vel_x = 0.0
 		_conflict_timer = 0.0
 		_spark_particles.emitting = false
