@@ -64,6 +64,7 @@ func play_airborne() -> void:
 
 
 func play_collide() -> void:
+	_land_player.stop()
 	_collide_player.play()
 
 
