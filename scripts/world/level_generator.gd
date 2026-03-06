@@ -39,6 +39,12 @@ const MOGULS_PER_FIELD_MIN := 5
 const MOGULS_PER_FIELD_MAX := 10
 const MOGUL_FIELD_SPREAD_Z := 16.0
 
+# Bushes (pentagonal bipyramid, glades only)
+const BUSH_RADIUS := 1.3
+const BUSH_HEIGHT := 1.5
+const BUSH_SINK := 0.2
+const BUSH_CLUSTER_SPREAD := 2.0
+
 # Trees
 const TREE_TRUNK_RADIUS := 0.30
 const TREE_TRUNK_HEIGHT := 2.4
@@ -65,26 +71,17 @@ const LEVELS := [
 	{
 		"name": "THE PARK",
 		"chunks": 5,
-		"tree": 0.05,
-		"rail": 0.40,
-		"mogul": 0.00,
-		"ramp": 0.40,
+		"tree": 0.05, "rail": 0.40, "mogul": 0.00, "ramp": 0.40, "bush": 0.00,
 	},
 	{
 		"name": "THE RUNS",
 		"chunks": 5,
-		"tree": 0.05,
-		"rail": 0.10,
-		"mogul": 0.55,
-		"ramp": 0.10,
+		"tree": 0.05, "rail": 0.10, "mogul": 0.55, "ramp": 0.10, "bush": 0.00,
 	},
 	{
 		"name": "THE GLADES",
 		"chunks": 5,
-		"tree": 0.45,
-		"rail": 0.10,
-		"mogul": 0.15,
-		"ramp": 0.05,
+		"tree": 0.35, "rail": 0.08, "mogul": 0.10, "ramp": 0.03, "bush": 0.20,
 	},
 ]
 
@@ -211,6 +208,10 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
 			var ramp_length := randf_range(RAMP_LENGTH_MIN, RAMP_LENGTH_MAX)
 			root.add_child(_make_ramp(Vector3(rx, 0.0, z), ramp_angle, ramp_length))
+		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush:
+			var max_offset := FLOOR_WIDTH * 0.5 - BUSH_RADIUS - 0.5
+			var bx := randf_range(-max_offset, max_offset)
+			root.add_child(_make_bush_cluster(Vector3(bx, 0.0, z)))
 		z -= RAMP_SLOT_SPACING
 
 
@@ -524,6 +525,99 @@ func _make_tree(pos: Vector3) -> Node3D:
 	root.add_child(area)
 
 	return root
+
+
+func _make_bush_cluster(center: Vector3) -> Node3D:
+	var cluster := Node3D.new()
+	cluster.position = center
+	var count := randi_range(2, 5)
+	for i in range(count):
+		var ox := randf_range(-BUSH_CLUSTER_SPREAD, BUSH_CLUSTER_SPREAD)
+		var oz := randf_range(-BUSH_CLUSTER_SPREAD, BUSH_CLUSTER_SPREAD)
+		cluster.add_child(_make_bush(Vector3(ox, 0.0, oz)))
+	return cluster
+
+
+func _make_bush(pos: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+
+	var mesh_inst := MeshInstance3D.new()
+	mesh_inst.mesh = _make_bush_mesh()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = TREE_COLOR_FOLIAGE
+	mesh_inst.material_override = mat
+	root.add_child(mesh_inst)
+
+	var area := Area3D.new()
+	var area_col := CollisionShape3D.new()
+	var area_shape := CylinderShape3D.new()
+	area_shape.radius = BUSH_RADIUS * 0.85
+	area_shape.height = BUSH_HEIGHT
+	area_col.shape = area_shape
+	area_col.position.y = BUSH_HEIGHT * 0.5
+	area.add_child(area_col)
+	area.body_entered.connect(func(body: Node3D) -> void:
+		if body.has_method("crash"):
+			body.crash()
+	)
+	root.add_child(area)
+
+	return root
+
+
+func _make_bush_mesh() -> ArrayMesh:
+	var t := (1.0 + sqrt(5.0)) / 2.0   # golden ratio
+	var cr := sqrt(1.0 + t * t)         # icosahedron circumradius
+
+	# 12 icosahedron vertices (raw, unnormalized)
+	var raw: Array = [
+		Vector3(-1,  t,  0), Vector3( 1,  t,  0),
+		Vector3(-1, -t,  0), Vector3( 1, -t,  0),
+		Vector3( 0, -1,  t), Vector3( 0,  1,  t),
+		Vector3( 0, -1, -t), Vector3( 0,  1, -t),
+		Vector3( t,  0, -1), Vector3( t,  0,  1),
+		Vector3(-t,  0, -1), Vector3(-t,  0,  1),
+	]
+
+	# Normalize then scale: XZ → BUSH_RADIUS, Y → [-BUSH_SINK, BUSH_HEIGHT - BUSH_SINK]
+	var y_norm_min := -t / cr   # ≈ -0.851
+	var y_norm_max :=  t / cr   # ≈  0.851
+	var y_range := y_norm_max - y_norm_min
+
+	var pts: Array = []
+	for v: Vector3 in raw:
+		var n := v / cr
+		var y_t := (n.y - y_norm_min) / y_range  # 0..1
+		pts.append(Vector3(n.x * BUSH_RADIUS, y_t * BUSH_HEIGHT - BUSH_SINK, n.z * BUSH_RADIUS))
+
+	# 20 triangular faces — CCW winding from outside
+	var faces: Array = [
+		[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+		[1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+		[3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+		[4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+	]
+
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+
+	for face: Array in faces:
+		var a: Vector3 = pts[face[0]]
+		var b: Vector3 = pts[face[1]]
+		var c: Vector3 = pts[face[2]]
+		var n := (b - a).cross(c - a).normalized()
+		verts.append_array([a, b, c])
+		norms.append_array([n, n, n])
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 func _make_lap_marker() -> MeshInstance3D:
