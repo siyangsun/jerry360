@@ -67,6 +67,8 @@ const RAIL_RAMP_GAP := 0.1        # gap between each ramp top and the flat secti
 # ── Level configs ─────────────────────────────────────────────────────────────
 # Each level: name, chunks before advancing, and obstacle spawn weights.
 # Weights are evaluated in order (tree → rail → mogul → ramp); remaining roll = empty slot.
+const EMPTY_LEVEL := { "tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0 }
+
 const LEVELS := [
 	{
 		"name": "THE PARK",
@@ -94,6 +96,8 @@ var _chunk_count: int = 0
 var _level_index: int = 0
 var _level_number: int = 1
 var _chunks_in_level: int = 0
+var _startup_empty_chunks: int = 0   # first N chunks spawn empty
+var _startup_chunks_remaining: int = 0  # suppress level counting during initial spawn
 
 
 func _ready() -> void:
@@ -123,14 +127,24 @@ func _process(_delta: float) -> void:
 
 func _spawn_chunk() -> void:
 	_chunk_count += 1
-	_chunks_in_level += 1
-	var cfg: Dictionary = LEVELS[_level_index]
-	if _chunks_in_level > cfg["chunks"]:
-		_level_index = (_level_index + 1) % LEVELS.size()
-		_level_number += 1
-		_chunks_in_level = 1
-		cfg = LEVELS[_level_index]
-		level_changed.emit(cfg["name"], _level_number)
+
+	var use_empty := _startup_empty_chunks > 0
+	if use_empty:
+		_startup_empty_chunks -= 1
+
+	var count_level := _startup_chunks_remaining <= 0
+	if _startup_chunks_remaining > 0:
+		_startup_chunks_remaining -= 1
+
+	var cfg: Dictionary = EMPTY_LEVEL if use_empty else LEVELS[_level_index]
+	if count_level:
+		_chunks_in_level += 1
+		if _chunks_in_level > cfg["chunks"]:
+			_level_index = (_level_index + 1) % LEVELS.size()
+			_level_number += 1
+			_chunks_in_level = 1
+			cfg = LEVELS[_level_index]
+			level_changed.emit(cfg["name"], _level_number)
 
 	var chunk: Node3D
 	if chunk_scenes.is_empty():
@@ -674,6 +688,12 @@ func _reset() -> void:
 	_level_index = 0
 	_level_number = 1
 	_chunks_in_level = 0
-	level_changed.emit(LEVELS[0]["name"], 1)
+	_startup_empty_chunks = 2
+	_startup_chunks_remaining = CHUNKS_AHEAD + 1
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()
+	# Re-anchor level state after initial spawn so play starts at level 1
+	_level_index = 0
+	_level_number = 1
+	_chunks_in_level = 0
+	level_changed.emit(LEVELS[0]["name"], 1)
