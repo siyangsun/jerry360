@@ -14,6 +14,7 @@ var _next_lap_dist: float = LAP_DISTANCE
 var _combo_label: Label
 var _goofy_label: Label
 var _goofy_time: float = 0.0
+var _is_goofy: bool = false
 var _danger_label: Label
 var _danger_vignette: ColorRect
 var _level_label: Label
@@ -38,10 +39,12 @@ func _ready() -> void:
 	_goofy_label = Label.new()
 	_goofy_label.text = "GOOFY"
 	_goofy_label.visible = false
-	_goofy_label.add_theme_font_size_override("font_size", 72)
-	_goofy_label.set_anchors_preset(Control.PRESET_CENTER)
+	_goofy_label.add_theme_font_size_override("font_size", 64)
+	_goofy_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_goofy_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_goofy_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_goofy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_goofy_label.position.y = 12.0
+	_goofy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_goofy_label)
 
 	_danger_vignette = ColorRect.new()
@@ -124,10 +127,12 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		var dist := ScoreManager.distance
 		var best := ScoreManager.high_score
 		var deaths := ScoreManager.deaths
-		death_label.text = "He fell.\n%.0f meters — not bad for a Tuesday.\n\nBest: %.0f m  |  Falls: %d" % [dist, best, deaths]
+		var first_line := "Got a little too goofy." if _is_goofy else "He fell."
+		death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, best, deaths]
 
 
 func _on_stance_changed(goofy: bool) -> void:
+	_is_goofy = goofy
 	_goofy_label.visible = goofy and GameManager.state == GameManager.State.PLAYING
 	if goofy:
 		_goofy_time = 0.0
