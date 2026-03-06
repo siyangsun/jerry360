@@ -3,6 +3,8 @@ extends Node3D
 # Chunk-based infinite level generation.
 # Chunks spawn ahead of the player and are recycled behind.
 
+signal level_changed(level_name: String, level_index: int)
+
 const CHUNK_LENGTH := 80.0
 const CHUNKS_AHEAD := 10
 const CHUNKS_BEHIND := 2
@@ -26,12 +28,10 @@ const RAMP_LENGTH_MIN := 5.0
 const RAMP_LENGTH_MAX := 15.0
 const RAMP_WIDTH := 5.0
 const RAMP_THICKNESS := 0.1
-const RAMP_SPAWN_CHANCE := 0.5  # chance per slot (after rail roll)
 const RAMP_SLOT_SPACING := 44.0  # meters between spawn slots
 const RAMP_MARGIN := 15.0        # clear space at each chunk end
 
 # Moguls
-const MOGUL_SPAWN_CHANCE := 0.25
 const MOGUL_BASE := 1.2           # half-width of square base
 const MOGUL_HEIGHT := 0.6         # apex above floor — "slightly" sticking out
 const MOGUL_SINK := 0.08          # base sinks this far below y=0 so it's flush
@@ -44,13 +44,11 @@ const TREE_TRUNK_RADIUS := 0.30
 const TREE_TRUNK_HEIGHT := 2.4
 const TREE_FOLIAGE_RADIUS := 1.6
 const TREE_FOLIAGE_HEIGHT := 5.6
-const TREE_SPAWN_CHANCE := 0.10
 const TREE_CLUSTER_SPREAD := 6.0
 const TREE_COLOR_FOLIAGE := Color(0.05, 0.28, 0.05)
 const TREE_COLOR_TRUNK := Color(0.22, 0.12, 0.05)
 
 # Rails
-const RAIL_SPAWN_CHANCE := 0.25   # checked first — rails are rarer than ramps
 const RAIL_WIDTH_VISUAL := 0.25
 const RAIL_WIDTH_COLLISION := 0.4  # wider than visual so Jerry stays on
 const RAIL_HEIGHT := 0.12          # thickness of the flat rail slab
@@ -60,15 +58,49 @@ const RAIL_PEAK_HEIGHT := 1.5      # how high the flat section is above the grou
 const RAIL_RAMP_SECTION := 4.5    # length of each ramp (on-ramp and off-ramp)
 const RAIL_RAMP_GAP := 0.1        # gap between each ramp top and the flat section
 
+# ── Level configs ─────────────────────────────────────────────────────────────
+# Each level: name, chunks before advancing, and obstacle spawn weights.
+# Weights are evaluated in order (tree → rail → mogul → ramp); remaining roll = empty slot.
+const LEVELS := [
+	{
+		"name": "THE PARK",
+		"chunks": 5,
+		"tree": 0.05,
+		"rail": 0.40,
+		"mogul": 0.00,
+		"ramp": 0.40,
+	},
+	{
+		"name": "THE RUNS",
+		"chunks": 5,
+		"tree": 0.05,
+		"rail": 0.10,
+		"mogul": 0.55,
+		"ramp": 0.10,
+	},
+	{
+		"name": "THE GLADES",
+		"chunks": 5,
+		"tree": 0.45,
+		"rail": 0.10,
+		"mogul": 0.15,
+		"ramp": 0.05,
+	},
+]
+
 @export var chunk_scenes: Array[PackedScene] = []
 @export var player: CharacterBody3D
 
 var _active_chunks: Array[Node3D] = []
 var _spawn_z: float = 0.0  # next chunk spawn position (negative Z = forward)
 var _chunk_count: int = 0
+var _level_index: int = 0
+var _level_number: int = 1
+var _chunks_in_level: int = 0
 
 
 func _ready() -> void:
+	add_to_group("level_generator")
 	if not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player") as CharacterBody3D
 	GameManager.state_changed.connect(_on_state_changed)
@@ -94,9 +126,18 @@ func _process(_delta: float) -> void:
 
 func _spawn_chunk() -> void:
 	_chunk_count += 1
+	_chunks_in_level += 1
+	var cfg: Dictionary = LEVELS[_level_index]
+	if _chunks_in_level > cfg["chunks"]:
+		_level_index = (_level_index + 1) % LEVELS.size()
+		_level_number += 1
+		_chunks_in_level = 1
+		cfg = LEVELS[_level_index]
+		level_changed.emit(cfg["name"], _level_number)
+
 	var chunk: Node3D
 	if chunk_scenes.is_empty():
-		chunk = _make_fallback_chunk()
+		chunk = _make_fallback_chunk(cfg)
 	else:
 		chunk = chunk_scenes[randi() % chunk_scenes.size()].instantiate()
 
@@ -106,7 +147,7 @@ func _spawn_chunk() -> void:
 	_spawn_z -= CHUNK_LENGTH
 
 
-func _make_fallback_chunk() -> Node3D:
+func _make_fallback_chunk(cfg: Dictionary) -> Node3D:
 	var root := Node3D.new()
 	root.name = "FallbackChunk"
 
@@ -143,28 +184,28 @@ func _make_fallback_chunk() -> Node3D:
 		true
 	))
 
-	_maybe_add_obstacles(root)
+	_maybe_add_obstacles(root, cfg)
 	if _chunk_count % LAP_CHUNKS == 0:
 		root.add_child(_make_lap_marker())
 	return root
 
 
-func _maybe_add_obstacles(root: Node3D) -> void:
+func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 	var z := -RAMP_MARGIN
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
-		if roll < TREE_SPAWN_CHANCE:
+		if roll < cfg.tree:
 			var max_offset := FLOOR_WIDTH * 0.5 - TREE_FOLIAGE_RADIUS - 0.5
 			var tx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_tree_cluster(Vector3(tx, 0.0, z)))
-		elif roll < TREE_SPAWN_CHANCE + RAIL_SPAWN_CHANCE:
+		elif roll < cfg.tree + cfg.rail:
 			var length := randf_range(RAIL_LENGTH_MIN, RAIL_LENGTH_MAX)
 			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
-		elif roll < TREE_SPAWN_CHANCE + RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE:
+		elif roll < cfg.tree + cfg.rail + cfg.mogul:
 			root.add_child(_make_mogul_field(Vector3(0.0, 0.0, z)))
-		elif roll < TREE_SPAWN_CHANCE + RAIL_SPAWN_CHANCE + MOGUL_SPAWN_CHANCE + RAMP_SPAWN_CHANCE:
+		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp:
 			var max_offset := FLOOR_WIDTH * 0.5 - RAMP_WIDTH * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
@@ -221,7 +262,6 @@ func _make_ramp_visual(w: float, l: float, h: float, angle: float) -> ArrayMesh:
 	var back_n := Vector3(0.0, 0.0, -1.0)
 	var left_n := Vector3(-1.0, 0.0, 0.0)
 	var rght_n := Vector3( 1.0, 0.0, 0.0)
-	var bot_n  := Vector3(0.0, -1.0, 0.0)
 
 	var verts := PackedVector3Array([
 		fl,  fr,  brt,   fl,  brt, blt,   # top (riding surface)
@@ -537,5 +577,9 @@ func _reset() -> void:
 	_active_chunks.clear()
 	_spawn_z = 0.0
 	_chunk_count = 0
+	_level_index = 0
+	_level_number = 1
+	_chunks_in_level = 0
+	level_changed.emit(LEVELS[0]["name"], 1)
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()

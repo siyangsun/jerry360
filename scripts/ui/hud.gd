@@ -16,9 +16,17 @@ var _goofy_label: Label
 var _goofy_time: float = 0.0
 var _danger_label: Label
 var _danger_vignette: ColorRect
+var _level_label: Label
 
 
 func _ready() -> void:
+	_level_label = Label.new()
+	_level_label.add_theme_font_size_override("font_size", 18)
+	_level_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_level_label.position = Vector2(8.0, 8.0)
+	_level_label.visible = false
+	add_child(_level_label)
+
 	_combo_label = Label.new()
 	_combo_label.visible = false
 	_combo_label.add_theme_font_size_override("font_size", 24)
@@ -56,7 +64,14 @@ func _ready() -> void:
 	if player:
 		player.stance_changed.connect(_on_stance_changed)
 		player.wipeout_danger.connect(_on_wipeout_danger)
+	call_deferred("_connect_level_generator")
 	_on_state_changed(GameManager.state)
+
+
+func _connect_level_generator() -> void:
+	var level_gen := get_tree().get_first_node_in_group("level_generator")
+	if level_gen:
+		level_gen.level_changed.connect(_on_level_changed)
 
 
 func _process(delta: float) -> void:
@@ -93,6 +108,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	menu_screen.visible = new_state == GameManager.State.MENU
 	death_screen.visible = new_state == GameManager.State.DEAD
 	distance_label.visible = new_state == GameManager.State.PLAYING
+	_level_label.visible = new_state == GameManager.State.PLAYING
 	if new_state != GameManager.State.PLAYING:
 		_combo_label.visible = false
 		_goofy_label.visible = false
@@ -133,6 +149,11 @@ func _on_wipeout_danger(intensity: float, reason: int) -> void:
 
 func _on_start_pressed() -> void:
 	GameManager.start_game()
+
+
+func _on_level_changed(level_name: String, level_number: int) -> void:
+	_level_label.text = "LEVEL %d: %s" % [level_number, level_name]
+	_level_label.visible = GameManager.state == GameManager.State.PLAYING
 
 
 func _on_try_again_pressed() -> void:
