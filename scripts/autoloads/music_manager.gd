@@ -8,6 +8,8 @@ const GAMEPLAY_SONGS: Array[String] = [
 	"res://assets/audio/music/KRAZYKRAZY.mp3",
 	"res://assets/audio/music/osmanthus danger.mp3",
 	"res://assets/audio/music/decimba.mp3",
+	"res://assets/audio/music/neon snowcone.mp3",
+	"res://assets/audio/music/watch out.mp3",
 ]
 
 const VOLUME_DB := -3.1
