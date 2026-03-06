@@ -1,5 +1,7 @@
 extends Node
 
+signal song_changed(song_name: String)
+
 var _menu_player: AudioStreamPlayer
 var _game_player: AudioStreamPlayer
 var _death_player: AudioStreamPlayer
@@ -45,10 +47,12 @@ func _play_random_gameplay_song() -> void:
 	if _song_queue.is_empty():
 		_song_queue = GAMEPLAY_SONGS.duplicate()
 		_song_queue.shuffle()
-	var stream := load(_song_queue.pop_front()) as AudioStreamMP3
+	var path := _song_queue.pop_front() as String
+	var stream := load(path) as AudioStreamMP3
 	stream.loop = false
 	_game_player.stream = stream
 	_game_player.play()
+	song_changed.emit(path.get_file().get_basename())
 
 
 func _on_state_changed(new_state: GameManager.State) -> void:
@@ -64,6 +68,12 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 			_death_player.stop()
 		GameManager.State.PAUSED:
 			pass  # keep whatever is playing
+
+
+func skip_song() -> void:
+	if _game_player.playing:
+		_game_player.stop()
+		_play_random_gameplay_song()
 
 
 func _switch_to(start: AudioStreamPlayer, stop: Array) -> void:

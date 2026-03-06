@@ -18,6 +18,8 @@ var _is_goofy: bool = false
 var _danger_label: Label
 var _danger_vignette: ColorRect
 var _level_label: Label
+var _skip_btn: Button
+var _now_playing_label: Label
 
 
 func _ready() -> void:
@@ -61,6 +63,43 @@ func _ready() -> void:
 	_danger_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	add_child(_danger_label)
 
+	_now_playing_label = Label.new()
+	_now_playing_label.text = "now playing\n"
+	_now_playing_label.add_theme_font_size_override("font_size", 11)
+	_now_playing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_now_playing_label.anchor_left = 1.0
+	_now_playing_label.anchor_right = 1.0
+	_now_playing_label.anchor_top = 0.0
+	_now_playing_label.anchor_bottom = 0.0
+	_now_playing_label.offset_right = -8.0
+	_now_playing_label.offset_left = -140.0
+	_now_playing_label.offset_top = 8.0
+	_now_playing_label.offset_bottom = 36.0
+	_now_playing_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	_now_playing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_now_playing_label.visible = false
+	add_child(_now_playing_label)
+
+	_skip_btn = Button.new()
+	_skip_btn.text = ">> skip"
+	_skip_btn.add_theme_font_size_override("font_size", 14)
+	_skip_btn.anchor_left = 1.0
+	_skip_btn.anchor_right = 1.0
+	_skip_btn.anchor_top = 0.0
+	_skip_btn.anchor_bottom = 0.0
+	_skip_btn.offset_right = -8.0
+	_skip_btn.offset_left = -80.0
+	_skip_btn.offset_top = 38.0
+	_skip_btn.offset_bottom = 60.0
+	_skip_btn.flat = true
+	_skip_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.65))
+	_skip_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1.0))
+	_skip_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 0.4))
+	_skip_btn.visible = false
+	_skip_btn.pressed.connect(MusicManager.skip_song)
+	add_child(_skip_btn)
+
+	MusicManager.song_changed.connect(_on_song_changed)
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	GameManager.state_changed.connect(_on_state_changed)
 	var player := get_tree().get_first_node_in_group("player")
@@ -112,6 +151,8 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	death_screen.visible = new_state == GameManager.State.DEAD
 	distance_label.visible = new_state == GameManager.State.PLAYING
 	_level_label.visible = new_state == GameManager.State.PLAYING
+	_skip_btn.visible = new_state == GameManager.State.PLAYING
+	_now_playing_label.visible = new_state == GameManager.State.PLAYING
 	if new_state != GameManager.State.PLAYING:
 		_combo_label.visible = false
 		_goofy_label.visible = false
@@ -163,3 +204,7 @@ func _on_level_changed(level_name: String, level_number: int) -> void:
 
 func _on_try_again_pressed() -> void:
 	GameManager.start_game()
+
+
+func _on_song_changed(song_name: String) -> void:
+	_now_playing_label.text = "now playing\n" + song_name
