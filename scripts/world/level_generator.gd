@@ -93,11 +93,11 @@ const LEVELS := [
 var _active_chunks: Array[Node3D] = []
 var _spawn_z: float = 0.0  # next chunk spawn position (negative Z = forward)
 var _chunk_count: int = 0
-var _level_index: int = 0
-var _level_number: int = 1
-var _chunks_in_level: int = 0
-var _startup_empty_chunks: int = 0   # first N chunks spawn empty
-var _startup_chunks_remaining: int = 0  # suppress level counting during initial spawn
+
+# Display-side level tracking — follows player position, drives the HUD signal
+var _display_level_index: int = 0
+var _display_level_number: int = 1
+var _last_player_chunk: int = 0
 
 
 func _ready() -> void:
@@ -118,6 +118,15 @@ func _process(_delta: float) -> void:
 	while _spawn_z > player.position.z - CHUNKS_AHEAD * CHUNK_LENGTH:
 		_spawn_chunk()
 
+	# Advance displayed level when player crosses a lap marker boundary
+	var player_chunk := int(-player.position.z / CHUNK_LENGTH)
+	while player_chunk > _last_player_chunk:
+		_last_player_chunk += 1
+		if _last_player_chunk % LAP_CHUNKS == 0:
+			_display_level_index = (_display_level_index + 1) % LEVELS.size()
+			_display_level_number += 1
+			level_changed.emit(LEVELS[_display_level_index]["name"], _display_level_number)
+
 	var despawn_z := player.position.z + CHUNKS_BEHIND * CHUNK_LENGTH
 	for chunk in _active_chunks.duplicate():
 		if chunk.position.z > despawn_z:
@@ -128,23 +137,10 @@ func _process(_delta: float) -> void:
 func _spawn_chunk() -> void:
 	_chunk_count += 1
 
-	var use_empty := _startup_empty_chunks > 0
-	if use_empty:
-		_startup_empty_chunks -= 1
-
-	var count_level := _startup_chunks_remaining <= 0
-	if _startup_chunks_remaining > 0:
-		_startup_chunks_remaining -= 1
-
-	var cfg: Dictionary = EMPTY_LEVEL if use_empty else LEVELS[_level_index]
-	if count_level:
-		_chunks_in_level += 1
-		if _chunks_in_level > cfg["chunks"]:
-			_level_index = (_level_index + 1) % LEVELS.size()
-			_level_number += 1
-			_chunks_in_level = 1
-			cfg = LEVELS[_level_index]
-			level_changed.emit(cfg["name"], _level_number)
+	# Derive level from chunk position — same formula as the display side
+	var chunk_idx := int(-_spawn_z / CHUNK_LENGTH)
+	var level_idx := (chunk_idx / LAP_CHUNKS) % LEVELS.size()
+	var cfg: Dictionary = LEVELS[level_idx]
 
 	var chunk: Node3D
 	if chunk_scenes.is_empty():
@@ -685,15 +681,9 @@ func _reset() -> void:
 	_active_chunks.clear()
 	_spawn_z = 0.0
 	_chunk_count = 0
-	_level_index = 0
-	_level_number = 1
-	_chunks_in_level = 0
-	_startup_empty_chunks = 2
-	_startup_chunks_remaining = CHUNKS_AHEAD + 1
+	_display_level_index = 0
+	_display_level_number = 1
+	_last_player_chunk = 0
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()
-	# Re-anchor level state after initial spawn so play starts at level 1
-	_level_index = 0
-	_level_number = 1
-	_chunks_in_level = 0
 	level_changed.emit(LEVELS[0]["name"], 1)
