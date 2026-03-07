@@ -1,5 +1,8 @@
 [gd_scene load_steps=16 format=3]
 
+[ext_resource type="Shader" path="res://assets/shaders/lateral_fog.gdshader" id="1_latfog"]
+[ext_resource type="Shader" path="res://assets/shaders/player_fog.gdshader" id="1_playerfog"]
+[ext_resource type="Script" path="res://scripts/world/player_fog.gd" id="1_playerfogscript"]
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/world/level_generator.gd" id="2_levelgen"]
 [ext_resource type="Script" path="res://scripts/world/camera_rig.gd" id="3_camrig"]
@@ -38,6 +41,12 @@ ground_bottom_color = Color(0.9, 0.95, 1.0, 1)
 [sub_resource type="Sky" id="Sky_1"]
 sky_material = SubResource("SkyMat_1")
 
+[sub_resource type="ShaderMaterial" id="LatFogMat"]
+shader = ExtResource("1_latfog")
+
+[sub_resource type="ShaderMaterial" id="PlayerFogMat"]
+shader = ExtResource("1_playerfog")
+
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 2
 sky = SubResource("Sky_1")
@@ -46,6 +55,10 @@ ambient_light_energy = 0.5
 fog_enabled = true
 fog_density = 0.008
 fog_aerial_perspective = 0.3
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.0
+volumetric_fog_albedo = Color(0.85, 0.92, 1.0, 1)
+volumetric_fog_length = 128.0
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -93,6 +106,15 @@ mesh = SubResource("BoxMesh_board")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewportContainer/SubViewport/Player"]
 position = Vector3(0, 0.5, 0)
 shape = SubResource("Capsule_player")
+
+[node name="LateralFog" type="FogVolume" parent="SubViewportContainer/SubViewport"]
+shape = 4
+material = SubResource("LatFogMat")
+
+[node name="PlayerFog" type="FogVolume" parent="SubViewportContainer/SubViewport"]
+shape = 4
+material = SubResource("PlayerFogMat")
+script = ExtResource("1_playerfogscript")
 
 [node name="CameraRig" type="Node3D" parent="SubViewportContainer/SubViewport"]
 script = ExtResource("3_camrig")
