@@ -4,14 +4,21 @@ extends Node3D
 const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 
 @export var player: CharacterBody3D
-@export var offset := Vector3(0.0, 2.5, 8.0)        # behind and above
+@export var offset := Vector3(0.0, 2.5, 6.5)        # behind and above
 @export var look_offset := Vector3(0.0, 2.0, -12.0) # point ahead of player
 @export var follow_speed := 8.0
 @export var lateral_follow_speed := 12.0
 
-const SPEED_CAM_HEIGHT_DROP := 1.0  # how much lower the camera gets at max speed
-const SPEED_CAM_LOOK_RISE   := 1.0  # how much higher the look target gets at max speed
+const SPEED_CAM_HEIGHT_DROP := 1.0   # how much lower the camera gets at max speed
+const SPEED_CAM_LOOK_RISE   := 1.0   # how much higher the look target gets at max speed
 const LATERAL_SWAY_MULT     := -0.04 # look-target x shift per m/s of lateral velocity
+const ACCEL_CAM_Z_FOLLOW    := 8.0   # Z catch-up speed; lower = more lag behind player
+const ACCEL_DROP_RATE       := 0.07  # units dropped per m/s² of acceleration
+const ACCEL_DROP_MAX        := 0.7   # cap on downward bias
+const ACCEL_DROP_SMOOTH     := 4.0   # recovery speed when acceleration eases
+
+var _prev_speed := 0.0
+var _accel_drop := 0.0
 
 
 func _ready() -> void:
@@ -29,12 +36,17 @@ func _process(delta: float) -> void:
 		(GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED),
 		0.0, 1.0)
 
-	var dynamic_offset := offset + Vector3(0.0, -SPEED_CAM_HEIGHT_DROP * speed_ratio, 0.0)
+	var accel := (GameManager.current_speed - _prev_speed) / delta
+	_prev_speed = GameManager.current_speed
+	var target_drop := clampf(accel * ACCEL_DROP_RATE, 0.0, ACCEL_DROP_MAX)
+	_accel_drop = lerpf(_accel_drop, target_drop, ACCEL_DROP_SMOOTH * delta)
+
+	var dynamic_offset := offset + Vector3(0.0, -SPEED_CAM_HEIGHT_DROP * speed_ratio - _accel_drop, 0.0)
 	var target_pos := player.global_position + dynamic_offset
 	var new_pos := global_position
 	new_pos.x = lerpf(new_pos.x, target_pos.x, lateral_follow_speed * delta)
 	new_pos.y = lerpf(new_pos.y, target_pos.y, follow_speed * delta)
-	new_pos.z = target_pos.z
+	new_pos.z = lerpf(new_pos.z, target_pos.z, ACCEL_CAM_Z_FOLLOW * delta)
 	global_position = new_pos
 
 	var slope_drop := look_offset.z * tan(deg_to_rad(LevelGenerator.DOWNHILL_TILT_ANGLE))
