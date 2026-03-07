@@ -52,7 +52,6 @@ func _process(delta: float) -> void:
 	_prev_speed = GameManager.current_speed
 	var target_drop := clampf(accel * ACCEL_DROP_RATE, 0.0, ACCEL_DROP_MAX)
 	_accel_drop = lerpf(_accel_drop, target_drop, ACCEL_DROP_SMOOTH * delta)
-
 	var air_lift := AIR_CAM_LIFT if not player.is_on_floor() else 0.0
 	var dynamic_offset := offset + Vector3(0.0, -SPEED_CAM_HEIGHT_DROP * speed_ratio - _accel_drop + air_lift, 0.0)
 	var mesh_pivot := player.get_node_or_null("MeshPivot") as Node3D

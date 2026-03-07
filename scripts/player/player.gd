@@ -6,7 +6,12 @@ extends CharacterBody3D
 @export var lateral_counter_decel := 100.0      # how quickly Jerry kills his drift when leaning the opposite way
 @export var max_lateral_speed := 13.0           # maximum speed Jerry can move sideways
 @export var lean_max_lateral := 3.5             # how much the lean keys (A/D) contribute to sideways speed
-@export var jump_velocity := 10.0               # how high Jerry jumps
+@export var jump_velocity := 8.0                # how high Jerry jumps (uncharged)
+@export var charge_max_time := 0.6              # how long to hold down to reach full charge (seconds)
+@export var charge_jump_boost := 7.0            # extra jump height added at full charge
+@export var charge_release_window := 0.1        # seconds after releasing down where a charged jump still fires
+@export var jump_buffer_time := 0.2             # how long a jump input is remembered while still holding down (seconds)
+@export var charge_squat_scale := 0.825         # how much Jerry squishes down at full charge (fraction of normal height)
 @export var wall_gravity := 18.0                # how strongly the side walls pull Jerry back toward center
 @export var air_lean_friction_factor := 0.4     # sideways drift slows down slower in the air (fraction of normal)
 @export var rail_jump_lateral_factor := 0.7     # how much sideways speed is kept when jumping off a rail
@@ -92,6 +97,7 @@ var _snow_particles: GPUParticles3D
 var _yaw_recovery: bool = false
 var _is_leaning_fwd: bool = false
 var _is_leaning_back: bool = false
+var _is_squatting: bool = false
 var _turn_burst_frames: int = 0
 var _turn_burst_dir: float = 0.0
 
@@ -99,11 +105,21 @@ var _board_yaw: float = 0.0    # board facing angle offset from world forward (r
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
 var _conflict_timer: float = 0.0
+var _charge_timer: float = 0.0
+var _charge_amount: float = 0.0
+var _charge_release_window_timer: float = 0.0
+var _jump_buffer_timer: float = 0.0
 var _wipeout_danger_intensity: float = 0.0
 var _wipeout_danger_reason: WipeoutReason = WipeoutReason.NONE
 
-@onready var mesh_pivot: Node3D = $MeshPivot
+@onready var _squat_root: Node3D = $SquatRoot
+@onready var mesh_pivot: Node3D = $SquatRoot/MeshPivot
 @onready var snowboard_mesh: MeshInstance3D = $SnowboardMesh
+@onready var _collision_shape: CollisionShape3D = $CollisionShape3D
+
+const COLLIDER_FULL_HEIGHT := 1.0
+
+var _capsule: CapsuleShape3D
 
 
 func _ready() -> void:
@@ -113,6 +129,9 @@ func _ready() -> void:
 	add_child(_spark_particles)
 	_snow_particles = _make_snow_particles()
 	add_child(_snow_particles)
+	_squat_root.scale = Vector3.ONE
+	_capsule = _collision_shape.shape as CapsuleShape3D
+	assert(_capsule != null, "Player CollisionShape3D must use a CapsuleShape3D — check main.tscn")
 
 
 func _physics_process(delta: float) -> void:
@@ -125,9 +144,11 @@ func _physics_process(delta: float) -> void:
 
 	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
 	_is_leaning_back = is_on_floor() and Input.is_action_pressed("lean_back") and not _is_leaning_fwd
+	_is_squatting = is_on_floor() and Input.is_action_pressed("squat")
 
 	_handle_lean(delta)
 	_handle_board_turn(delta)
+	_handle_charge_jump(delta)
 	_handle_jump()
 	_handle_rail_lock(delta)
 	_apply_gravity(delta)
@@ -205,6 +226,10 @@ func _physics_process(delta: float) -> void:
 		elif _is_leaning_back:
 			pitch_target = lean_back_angle
 		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, pitch_target, 10.0 * delta)
+		var squat_y := lerpf(_squat_root.scale.y, lerpf(1.0, charge_squat_scale, _charge_timer / charge_max_time), 12.0 * delta)
+		_squat_root.scale = Vector3(1.0, squat_y, 1.0)
+		_capsule.height = COLLIDER_FULL_HEIGHT * squat_y
+		_collision_shape.position.y = _capsule.height * 0.5
 		if is_instance_valid(snowboard_mesh):
 			snowboard_mesh.rotation.y = mesh_pivot.rotation.y
 			snowboard_mesh.rotation.z = mesh_pivot.rotation.z
@@ -320,12 +345,46 @@ func _emit_danger(intensity: float, reason: WipeoutReason) -> void:
 		wipeout_danger.emit(intensity, reason)
 
 
+func _handle_charge_jump(delta: float) -> void:
+	if _jump_buffer_timer > 0.0:
+		_jump_buffer_timer -= delta
+	if is_on_floor() and _is_squatting:
+		_charge_timer = minf(_charge_timer + delta, charge_max_time)
+		_charge_release_window_timer = 0.0
+	else:
+		if _charge_timer > 0.0:
+			_charge_amount = _charge_timer / charge_max_time
+			_charge_release_window_timer = charge_release_window
+			_charge_timer = 0.0
+			# Do not snap the scale — stay compressed until the jump fires or the window expires
+		if _charge_release_window_timer > 0.0:
+			_charge_release_window_timer -= delta
+			if _charge_release_window_timer <= 0.0:
+				_charge_release_window_timer = 0.0
+				_charge_amount = 0.0
+
+
 func _handle_jump() -> void:
-	if is_on_floor() and Input.is_action_just_pressed("jump"):
-		velocity.y = jump_velocity
-		if _is_on_rail() or abs(get_floor_normal().x) > WALL_NORMAL_THRESHOLD:
-			var dir := Input.get_axis("lean_left", "lean_right")
-			velocity.x = dir * max_lateral_speed * rail_jump_lateral_factor
+	if not is_on_floor():
+		return
+	if Input.is_action_just_pressed("jump"):
+		if _is_squatting and _charge_timer > 0.0:
+			_jump_buffer_timer = jump_buffer_time  # buffer it — fires when Down is released
+			return
+		_fire_jump()
+	elif _jump_buffer_timer > 0.0 and _charge_release_window_timer > 0.0:
+		_jump_buffer_timer = 0.0
+		_fire_jump()
+
+
+func _fire_jump() -> void:
+	var boost := _charge_amount * charge_jump_boost if _charge_release_window_timer > 0.0 else 0.0
+	_charge_amount = 0.0
+	_charge_release_window_timer = 0.0
+	velocity.y = jump_velocity + boost
+	if _is_on_rail() or abs(get_floor_normal().x) > WALL_NORMAL_THRESHOLD:
+		var dir := Input.get_axis("lean_left", "lean_right")
+		velocity.x = dir * max_lateral_speed * rail_jump_lateral_factor
 
 
 func _apply_gravity(delta: float) -> void:
@@ -492,6 +551,10 @@ func _start_wipeout() -> void:
 	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
+	_charge_timer = 0.0
+	_charge_amount = 0.0
+	_charge_release_window_timer = 0.0
+	_jump_buffer_timer = 0.0
 	_wipeout_danger_intensity = 0.0
 	_wipeout_danger_reason = WipeoutReason.NONE
 	wipeout_danger.emit(0.0, WipeoutReason.NONE)
@@ -539,6 +602,7 @@ func _end_wipeout() -> void:
 	GameManager.current_speed = 0.0
 	if is_instance_valid(mesh_pivot):
 		mesh_pivot.rotation = Vector3.ZERO
+	_squat_root.scale = Vector3.ONE
 
 
 func _end_recovery() -> void:
@@ -653,6 +717,11 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_board_yaw_vel = 0.0
 		_lean_vel_x = 0.0
 		_conflict_timer = 0.0
+		_charge_timer = 0.0
+		_charge_amount = 0.0
+		_charge_release_window_timer = 0.0
+		_jump_buffer_timer = 0.0
+		_squat_root.scale = Vector3.ONE
 		_wipeout_danger_intensity = 0.0
 		_wipeout_danger_reason = WipeoutReason.NONE
 		wipeout_danger.emit(0.0, WipeoutReason.NONE)
