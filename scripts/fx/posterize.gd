@@ -2,11 +2,11 @@ extends ColorRect
 
 @export var levels: float = 6.0
 
-const BASE_LEVELS := 9.0
-const MIN_COMBO_LEVELS := 4.5    # crunchiest state at high combo
-const STOMP_LEVELS := 2.0        # brief harsh snap on stomp
-const STOMP_FLASH_DURATION := 0.25
-const COMBO_LEVELS_RAMP := 10    # combo count at which full crunch is reached
+const BASE_LEVELS := 9.0              # normal number of color steps during play (higher = smoother)
+const MIN_COMBO_LEVELS := 4.5         # fewest color steps at high combo — image gets grittier/crunchier
+const STOMP_LEVELS := 2.0             # color steps during a perfect stomp flash (very crunchy for a moment)
+const STOMP_FLASH_DURATION := 0.25    # how long the stomp crunch flash lasts (seconds)
+const COMBO_LEVELS_RAMP := 10         # combo count at which the image reaches maximum crunch
 
 var _target_levels: float = BASE_LEVELS
 var _current_levels: float = BASE_LEVELS

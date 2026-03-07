@@ -6,8 +6,8 @@ var deaths: int = 0
 var combo_count: int = 0
 var combo_multiplier: float = 1.0
 
-const COMBO_MULT_PER_COUNT := 0.25
-const COMBO_MAX_MULTIPLIER := 4.0
+const COMBO_MULT_PER_COUNT := 0.25  # score multiplier added per trick in a combo (stacks up)
+const COMBO_MAX_MULTIPLIER := 4.0   # highest possible score multiplier, no matter how big the combo
 
 signal distance_updated(dist: float)
 signal new_high_score(dist: float)

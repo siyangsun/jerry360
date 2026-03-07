@@ -5,67 +5,67 @@ extends Node3D
 
 signal level_changed(level_name: String, level_index: int)
 
-const CHUNK_LENGTH := 80.0
-const CHUNKS_AHEAD := 10
-const CHUNKS_BEHIND := 2
-const LAP_CHUNKS := 5  # how many chunks make one lap
+const CHUNK_LENGTH := 80.0      # length of each generated section of mountain (meters)
+const CHUNKS_AHEAD := 10        # how many sections are built in front of Jerry at all times
+const CHUNKS_BEHIND := 2        # how many sections are kept behind Jerry before being deleted
+const LAP_CHUNKS := 5           # how many sections make up one lap
 
 # Concave pipe cross-section
-const FLOOR_WIDTH := 18.0   # wide flat base
-const WALL_WIDTH := 4.5     # each angled side panel
-const WALL_ANGLE := 0.6981  # deg_to_rad(40) — slope of side panels from horizontal
-const PANEL_THICKNESS := 0.5
+const FLOOR_WIDTH := 18.0       # width of the flat riding surface
+const WALL_WIDTH := 4.5         # width of each angled side wall panel
+const WALL_ANGLE := 0.6981      # how steeply the side walls angle up (40 degrees)
+const PANEL_THICKNESS := 0.5    # thickness of floor and wall panels
 
 # Shared snow terrain surface properties
-const SNOW_COLOR := Color(0.88, 0.94, 1.0)
+const SNOW_COLOR := Color(0.88, 0.94, 1.0)  # slightly blue-tinted white
 const SNOW_ROUGHNESS := 0.88
-const SNOW_TERRAIN_SPEED_DRAIN := 4.0  # forward speed lost per second when on any snow obstacle
+const SNOW_TERRAIN_SPEED_DRAIN := 4.0       # speed lost per second when on snow obstacles (moguls, walls)
 
 # Ramps
-const RAMP_ANGLE_MIN := 0.10
-const RAMP_ANGLE_MAX := 0.270
-const RAMP_LENGTH_MIN := 5.0
-const RAMP_LENGTH_MAX := 15.0
-const RAMP_WIDTH := 5.0
-const RAMP_THICKNESS := 0.1
-const RAMP_SLOT_SPACING := 44.0  # meters between spawn slots
-const RAMP_MARGIN := 15.0        # clear space at each chunk end
+const RAMP_ANGLE_MIN := 0.10     # shallowest possible ramp angle
+const RAMP_ANGLE_MAX := 0.270    # steepest possible ramp angle
+const RAMP_LENGTH_MIN := 5.0     # shortest possible ramp (meters)
+const RAMP_LENGTH_MAX := 15.0    # longest possible ramp (meters)
+const RAMP_WIDTH := 5.0          # how wide each ramp is
+const RAMP_THICKNESS := 0.1      # visual thickness of the ramp surface
+const RAMP_SLOT_SPACING := 44.0  # meters between obstacle spawn slots in each section
+const RAMP_MARGIN := 15.0        # clear space kept at the start and end of each section
 
 # Moguls
-const MOGUL_BASE := 1.2           # half-width of square base
-const MOGUL_HEIGHT := 0.6         # apex above floor — "slightly" sticking out
-const MOGUL_SINK := 0.08          # base sinks this far below y=0 so it's flush
-const MOGULS_PER_FIELD_MIN := 5
-const MOGULS_PER_FIELD_MAX := 10
-const MOGUL_FIELD_SPREAD_Z := 16.0
+const MOGUL_BASE := 1.2           # half-width of each mogul bump
+const MOGUL_HEIGHT := 0.6         # how tall each mogul sticks up above the floor
+const MOGUL_SINK := 0.08          # how far the base dips below floor level (keeps it flush)
+const MOGULS_PER_FIELD_MIN := 5   # fewest moguls in one field
+const MOGULS_PER_FIELD_MAX := 10  # most moguls in one field
+const MOGUL_FIELD_SPREAD_Z := 16.0  # how spread out along the slope a mogul field is
 
-# Bushes (pentagonal bipyramid, glades only)
-const BUSH_RADIUS := 1.3
-const BUSH_HEIGHT := 1.5
-const BUSH_SINK := 0.2
-const BUSH_CLUSTER_SPREAD := 2.0
+# Bushes (glades only)
+const BUSH_RADIUS := 1.3         # how wide each bush is
+const BUSH_HEIGHT := 1.5         # how tall each bush is
+const BUSH_SINK := 0.2           # how far the base dips into the floor
+const BUSH_CLUSTER_SPREAD := 2.0 # how spread out bushes are within a cluster
 
-# Upright terrain tilt — lean toward camera to sell the downhill slope illusion
-const DOWNHILL_TILT_ANGLE := 20.0  # degrees; +X rotation tilts tops toward +Z (uphill/camera)
+# Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
+const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
 
 # Trees
-const TREE_TRUNK_RADIUS := 0.30
-const TREE_TRUNK_HEIGHT := 2.4
-const TREE_FOLIAGE_RADIUS := 1.6
-const TREE_FOLIAGE_HEIGHT := 5.6
-const TREE_CLUSTER_SPREAD := 6.0
-const TREE_COLOR_FOLIAGE := Color(0.05, 0.28, 0.05)
-const TREE_COLOR_TRUNK := Color(0.22, 0.12, 0.05)
+const TREE_TRUNK_RADIUS := 0.30    # how thick tree trunks are
+const TREE_TRUNK_HEIGHT := 2.4     # how tall the trunk is before foliage starts
+const TREE_FOLIAGE_RADIUS := 1.6   # how wide the foliage cone is at the base
+const TREE_FOLIAGE_HEIGHT := 5.6   # how tall the foliage cone is
+const TREE_CLUSTER_SPREAD := 6.0   # how spread out trees are within a cluster
+const TREE_COLOR_FOLIAGE := Color(0.05, 0.28, 0.05)  # dark pine green
+const TREE_COLOR_TRUNK := Color(0.22, 0.12, 0.05)    # dark brown
 
 # Rails
-const RAIL_WIDTH_VISUAL := 0.25
-const RAIL_WIDTH_COLLISION := 0.4  # wider than visual so Jerry stays on
+const RAIL_WIDTH_VISUAL := 0.25    # how wide the rail looks
+const RAIL_WIDTH_COLLISION := 0.4  # collision is wider than visual so Jerry stays on
 const RAIL_HEIGHT := 0.12          # thickness of the flat rail slab
-const RAIL_LENGTH_MIN := 25.0
-const RAIL_LENGTH_MAX := 75.0
-const RAIL_PEAK_HEIGHT := 1.5      # how high the flat section is above the ground
-const RAIL_RAMP_SECTION := 4.5    # length of each ramp (on-ramp and off-ramp)
-const RAIL_RAMP_GAP := 0.1        # gap between each ramp top and the flat section
+const RAIL_LENGTH_MIN := 25.0      # shortest possible rail (meters)
+const RAIL_LENGTH_MAX := 75.0      # longest possible rail (meters)
+const RAIL_PEAK_HEIGHT := 1.5      # how high the flat grinding section is above the ground
+const RAIL_RAMP_SECTION := 4.5     # length of the approach and exit ramps on each end
+const RAIL_RAMP_GAP := 0.1         # small gap between the ramp top and the flat section
 
 # ── Level configs ─────────────────────────────────────────────────────────────
 # Each level: name, chunks before advancing, and obstacle spawn weights.

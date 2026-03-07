@@ -4,12 +4,12 @@ enum State { MENU, PLAYING, PAUSED, DEAD }
 
 var state: State = State.MENU
 var current_speed: float = 12.0
-var ramp_multiplier: float = 1.0  # set by player each frame; >1 when going straight
+var ramp_multiplier: float = 1.0  # set by player each frame; higher when going straight
 
-const BASE_SPEED := 12.0
-const MAX_SPEED := 40.0
-const SPEED_RAMP_RATE := 0.5       # units/sec at base (turning)
-const STRAIGHT_RAMP_MULT := 3.0    # how many times faster when going straight
+const BASE_SPEED := 12.0           # Jerry's starting speed
+const MAX_SPEED := 40.0            # fastest Jerry can go without leaning forward
+const SPEED_RAMP_RATE := 0.5       # how many units of speed are added per second (while turning)
+const STRAIGHT_RAMP_MULT := 3.0    # going straight speeds up this many times faster than turning
 
 signal state_changed(new_state: State)
 signal speed_changed(new_speed: float)
