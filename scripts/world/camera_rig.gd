@@ -1,6 +1,8 @@
 extends Node3D
 ## Follows the player with a fixed downhill camera angle.
 
+const LevelGenerator = preload("res://scripts/world/level_generator.gd")
+
 @export var player: CharacterBody3D
 @export var offset := Vector3(0.0, 2.5, 8.0)        # behind and above
 @export var look_offset := Vector3(0.0, 2.0, -12.0) # point ahead of player
@@ -35,6 +37,8 @@ func _process(delta: float) -> void:
 	new_pos.z = target_pos.z
 	global_position = new_pos
 
-	var dynamic_look := look_offset + Vector3(0.0, SPEED_CAM_LOOK_RISE * speed_ratio, 0.0)
+	var slope_drop := look_offset.z * tan(deg_to_rad(LevelGenerator.DOWNHILL_TILT_ANGLE))
+	var dynamic_look := look_offset + Vector3(0.0, SPEED_CAM_LOOK_RISE * speed_ratio + slope_drop, 0.0)
 	var sway_x := player.velocity.x * LATERAL_SWAY_MULT
 	look_at(player.global_position + dynamic_look + Vector3(sway_x, 0.0, 0.0), Vector3.UP)
+	rotate_object_local(Vector3.RIGHT, deg_to_rad(LevelGenerator.DOWNHILL_TILT_ANGLE * 0.5))

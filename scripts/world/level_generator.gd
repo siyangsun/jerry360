@@ -45,6 +45,9 @@ const BUSH_HEIGHT := 1.5
 const BUSH_SINK := 0.2
 const BUSH_CLUSTER_SPREAD := 2.0
 
+# Upright terrain tilt — lean toward camera to sell the downhill slope illusion
+const DOWNHILL_TILT_ANGLE := 20.0  # degrees; +X rotation tilts tops toward +Z (uphill/camera)
+
 # Trees
 const TREE_TRUNK_RADIUS := 0.30
 const TREE_TRUNK_HEIGHT := 2.4
@@ -490,6 +493,7 @@ func _make_tree_cluster(center: Vector3) -> Node3D:
 func _make_tree(pos: Vector3) -> Node3D:
 	var root := Node3D.new()
 	root.position = pos
+	root.rotation_degrees.x = DOWNHILL_TILT_ANGLE
 
 	# Trunk — skinny triangular prism
 	var trunk_mat := StandardMaterial3D.new()
