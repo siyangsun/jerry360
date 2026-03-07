@@ -23,16 +23,16 @@ func _physics_process(_delta: float) -> void:
 func _setup_snow() -> void:
 	_snow = GPUParticles3D.new()
 	_snow.amount = 60
-	_snow.lifetime = 1.0
+	_snow.lifetime = 1.4
 	_snow.local_coords = false
 	_snow.position = Vector3(0.0, 0.05, 0.25)
 
 	var mat := ParticleProcessMaterial.new()
-	mat.direction = Vector3(0, 1, 0)
-	mat.spread = 65.0
-	mat.gravity = Vector3(0, -5.0, 0)
-	mat.initial_velocity_min = 2.5
-	mat.initial_velocity_max = 7.0
+	mat.direction = Vector3(0, 1, 0.4)  # upward + slight backward kick
+	mat.spread = 50.0
+	mat.gravity = Vector3(0, -1.5, 0)  # low gravity so they actually float up
+	mat.initial_velocity_min = 3.0
+	mat.initial_velocity_max = 9.0
 	mat.scale_min = 0.06
 	mat.scale_max = 0.18
 
@@ -63,7 +63,7 @@ func _setup_trail() -> void:
 	_trail.position = Vector3(0.0, 0.04, 0.2)
 
 	var mat := ParticleProcessMaterial.new()
-	mat.direction = Vector3(0, 0.1, 1)
+	mat.direction = Vector3(0, 0.4, 1)  # more upward than before
 	mat.spread = 10.0
 	mat.gravity = Vector3.ZERO
 	mat.initial_velocity_min = 0.1
