@@ -9,21 +9,21 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var follow_speed := 8.0
 @export var lateral_follow_speed := 12.0
 
-const SPEED_CAM_HEIGHT_DROP := 1.0   # how much lower the camera gets at max speed
-const SPEED_CAM_LOOK_RISE   := 1.0   # how much higher the look target gets at max speed
-const LATERAL_SWAY_MULT     := -0.10 # look-target x shift per m/s of lateral velocity
-const LATERAL_CAM_LEAN      :=  0.03 # camera position x shift per m/s of lateral velocity
-const CAM_CARVE_LEAN        :=  -2.0    # lateral position shift = lean * board_yaw * this scale
-const CAM_CARVE_ROLL        :=   0.04   # camera roll (rad) per unit of _carve_lean
-const CAM_LATERAL_DELAY     :=   1.5    # lerp speed for all lateral lean (lower = more delay)
-const ACCEL_CAM_Z_FOLLOW    := 8.0   # Z catch-up speed; lower = more lag behind player
-const ACCEL_DROP_RATE       := 0.07  # units dropped per m/s² of acceleration
-const ACCEL_DROP_MAX        := 0.7   # cap on downward bias
-const ACCEL_DROP_SMOOTH     := 4.0   # recovery speed when acceleration eases
+const SPEED_CAM_HEIGHT_DROP := 1.0   # camera gets lower as Jerry goes faster (feels more tucked in)
+const SPEED_CAM_LOOK_RISE   := 1.0   # camera looks further ahead as speed increases
+const LATERAL_SWAY_MULT     := -0.10 # how much the camera looks into a turn (higher = more)
+const LATERAL_CAM_LEAN      :=  0.03 # how much the camera drifts sideways with Jerry's speed
+const CAM_CARVE_LEAN        :=  -2.0    # how far the camera swings out during a real carving turn (lean + yaw together)
+const CAM_CARVE_ROLL        :=   0.04   # slight camera tilt during a carve — higher feels more cinematic
+const CAM_LATERAL_DELAY     :=   1.5    # how sluggishly the camera reacts to sideways movement (lower = more delay)
+const ACCEL_CAM_Z_FOLLOW    := 8.0   # how quickly the camera catches up when Jerry accelerates forward
+const ACCEL_DROP_RATE       := 0.07  # how much the camera dips on a burst of acceleration
+const ACCEL_DROP_MAX        := 0.7   # maximum dip amount — keeps it from going crazy
+const ACCEL_DROP_SMOOTH     := 4.0   # how fast the camera recovers from the dip
 
-const SPEED_FOV_BASE  := 68.0  # FOV at minimum speed
-const SPEED_FOV_BOOST := 12.0  # extra degrees added at max speed
-const AIR_CAM_LIFT    := 1.4   # units the camera rises while player is airborne
+const SPEED_FOV_BASE  := 68.0  # normal field of view at slow speed (higher = wider angle)
+const SPEED_FOV_BOOST := 12.0  # extra field of view added at top speed (makes it feel faster)
+const AIR_CAM_LIFT    := 1.4   # camera rises when Jerry is in the air so you can see the landing
 
 var _prev_speed := 0.0
 var _accel_drop := 0.0
