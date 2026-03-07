@@ -11,7 +11,11 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 
 const SPEED_CAM_HEIGHT_DROP := 1.0   # how much lower the camera gets at max speed
 const SPEED_CAM_LOOK_RISE   := 1.0   # how much higher the look target gets at max speed
-const LATERAL_SWAY_MULT     := -0.04 # look-target x shift per m/s of lateral velocity
+const LATERAL_SWAY_MULT     := -0.10 # look-target x shift per m/s of lateral velocity
+const LATERAL_CAM_LEAN      :=  0.03 # camera position x shift per m/s of lateral velocity
+const CAM_CARVE_LEAN        :=  -2.0    # lateral position shift = lean * board_yaw * this scale
+const CAM_CARVE_ROLL        :=   0.04   # camera roll (rad) per unit of _carve_lean
+const CAM_LATERAL_DELAY     :=   1.5    # lerp speed for all lateral lean (lower = more delay)
 const ACCEL_CAM_Z_FOLLOW    := 8.0   # Z catch-up speed; lower = more lag behind player
 const ACCEL_DROP_RATE       := 0.07  # units dropped per m/s² of acceleration
 const ACCEL_DROP_MAX        := 0.7   # cap on downward bias
@@ -23,6 +27,8 @@ const AIR_CAM_LIFT    := 1.4   # units the camera rises while player is airborne
 
 var _prev_speed := 0.0
 var _accel_drop := 0.0
+var _vel_lean := 0.0
+var _carve_lean := 0.0
 var _camera: Camera3D
 
 
@@ -49,7 +55,12 @@ func _process(delta: float) -> void:
 
 	var air_lift := AIR_CAM_LIFT if not player.is_on_floor() else 0.0
 	var dynamic_offset := offset + Vector3(0.0, -SPEED_CAM_HEIGHT_DROP * speed_ratio - _accel_drop + air_lift, 0.0)
-	var target_pos := player.global_position + dynamic_offset
+	var mesh_pivot := player.get_node_or_null("MeshPivot") as Node3D
+	_vel_lean = lerpf(_vel_lean, player.velocity.x * LATERAL_CAM_LEAN, CAM_LATERAL_DELAY * delta)
+	var carve_lean_target: float = mesh_pivot.rotation.z * player._board_yaw * CAM_CARVE_LEAN if is_instance_valid(mesh_pivot) else 0.0
+	_carve_lean = lerpf(_carve_lean, carve_lean_target, CAM_LATERAL_DELAY * delta)
+	var lateral_lean := _vel_lean + _carve_lean
+	var target_pos := player.global_position + dynamic_offset + Vector3(lateral_lean, 0.0, 0.0)
 	var new_pos := global_position
 	new_pos.x = lerpf(new_pos.x, target_pos.x, lateral_follow_speed * delta)
 	new_pos.y = lerpf(new_pos.y, target_pos.y, follow_speed * delta)
@@ -61,4 +72,5 @@ func _process(delta: float) -> void:
 	var sway_x := player.velocity.x * LATERAL_SWAY_MULT
 	look_at(player.global_position + dynamic_look + Vector3(sway_x, 0.0, 0.0), Vector3.UP)
 	rotate_object_local(Vector3.RIGHT, deg_to_rad(LevelGenerator.DOWNHILL_TILT_ANGLE * 0.5))
+	rotate_object_local(Vector3.FORWARD, _carve_lean * CAM_CARVE_ROLL)
 	_camera.fov = lerpf(_camera.fov, SPEED_FOV_BASE + SPEED_FOV_BOOST * speed_ratio, 6.0 * delta)
