@@ -1,10 +1,18 @@
 extends FogVolume
 
+const NORMAL_FOG_RADIUS  := 15000.0  # clear bubble radius during normal/steep runs (effectively no fog)
+const NORMAL_FOG_FALLOFF := 0.02     # fog density per unit past the bubble during normal runs
+const FOGGY_FOG_RADIUS   := 80.0     # clear bubble radius during foggy runs (fog starts close)
+const FOGGY_FOG_FALLOFF  := 0.05     # fog density per unit during foggy runs (thickens faster)
+
 var _player: Node3D
 
 
 func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player") as Node3D
+	var gen := get_tree().get_first_node_in_group("level_generator")
+	if gen:
+		gen.variant_changed.connect(_on_variant_changed)
 
 
 func _process(_delta: float) -> void:
@@ -12,3 +20,13 @@ func _process(_delta: float) -> void:
 		_player = get_tree().get_first_node_in_group("player") as Node3D
 		return
 	(material as ShaderMaterial).set_shader_parameter("player_pos", _player.position)
+
+
+func _on_variant_changed(variant: String) -> void:
+	var mat := material as ShaderMaterial
+	if variant == "misty":
+		mat.set_shader_parameter("fog_radius", FOGGY_FOG_RADIUS)
+		mat.set_shader_parameter("fog_falloff", FOGGY_FOG_FALLOFF)
+	else:
+		mat.set_shader_parameter("fog_radius", NORMAL_FOG_RADIUS)
+		mat.set_shader_parameter("fog_falloff", NORMAL_FOG_FALLOFF)

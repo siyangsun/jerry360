@@ -4,6 +4,7 @@ extends Node3D
 # Chunks spawn ahead of the player and are recycled behind.
 
 signal level_changed(level_name: String, level_index: int)
+signal variant_changed(variant: String)
 
 const CHUNK_LENGTH := 80.0      # length of each generated section of mountain (meters)
 const CHUNKS_AHEAD := 10        # how many sections are built in front of Jerry at all times
@@ -47,6 +48,14 @@ const BUSH_CLUSTER_SPREAD := 2.0 # how spread out bushes are within a cluster
 
 # Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
 const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
+
+# Lap variants — each lap rolls one of: regular, misty, steep
+const VARIANT_REGULAR := "regular"
+const VARIANT_MISTY   := "misty"
+const VARIANT_STEEP   := "steep"
+const VARIANT_MISTY_CHANCE := 0.25  # probability of a misty lap
+const VARIANT_STEEP_CHANCE := 0.25  # probability of a steep lap (remaining roll = regular)
+const STEEP_TILT_ANGLE := 30.0      # tree tilt on steep runs (degrees)
 
 # Trees
 const TREE_TRUNK_RADIUS := 0.30    # how thick tree trunks are
@@ -102,6 +111,10 @@ var _display_level_index: int = 0
 var _display_level_number: int = 1
 var _last_player_chunk: int = 0
 
+# Current lap variant
+var _active_variant: String = VARIANT_REGULAR
+var _active_tilt_angle: float = DOWNHILL_TILT_ANGLE
+
 
 func _ready() -> void:
 	add_to_group("level_generator")
@@ -128,7 +141,8 @@ func _process(_delta: float) -> void:
 		if _last_player_chunk % LAP_CHUNKS == 0:
 			_display_level_index = (_display_level_index + 1) % LEVELS.size()
 			_display_level_number += 1
-			level_changed.emit(LEVELS[_display_level_index]["name"], _display_level_number)
+			_pick_variant()
+			level_changed.emit(_make_display_name(LEVELS[_display_level_index]["name"]), _display_level_number)
 
 	var despawn_z := player.position.z + CHUNKS_BEHIND * CHUNK_LENGTH
 	for chunk in _active_chunks.duplicate():
@@ -493,7 +507,7 @@ func _make_tree_cluster(center: Vector3) -> Node3D:
 func _make_tree(pos: Vector3) -> Node3D:
 	var root := Node3D.new()
 	root.position = pos
-	root.rotation_degrees.x = DOWNHILL_TILT_ANGLE
+	root.rotation_degrees.x = _active_tilt_angle
 
 	# Trunk — skinny triangular prism
 	var trunk_mat := StandardMaterial3D.new()
@@ -674,6 +688,27 @@ func _make_panel(pos: Vector3, rot_z: float, size: Vector3, is_snow_terrain: boo
 	return body
 
 
+func _pick_variant() -> void:
+	var roll := randf()
+	if roll < VARIANT_MISTY_CHANCE:
+		_active_variant = VARIANT_MISTY
+	elif roll < VARIANT_MISTY_CHANCE + VARIANT_STEEP_CHANCE:
+		_active_variant = VARIANT_STEEP
+	else:
+		_active_variant = VARIANT_REGULAR
+	_active_tilt_angle = STEEP_TILT_ANGLE if _active_variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+	GameManager.set_variant(_active_variant)
+	variant_changed.emit(_active_variant)
+
+
+func _make_display_name(base: String) -> String:
+	# Inserts the variant prefix after "THE " — e.g. "THE MISTY PARK", "THE STEEP RUNS"
+	match _active_variant:
+		VARIANT_MISTY: return "THE MISTY " + base.substr(4)
+		VARIANT_STEEP: return "THE STEEP " + base.substr(4)
+		_: return base
+
+
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.PLAYING:
 		_reset()
@@ -688,6 +723,7 @@ func _reset() -> void:
 	_display_level_index = 0
 	_display_level_number = 1
 	_last_player_chunk = 0
+	_pick_variant()
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()
-	level_changed.emit(LEVELS[0]["name"], 1)
+	level_changed.emit(_make_display_name(LEVELS[0]["name"]), 1)
