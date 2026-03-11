@@ -51,7 +51,10 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var lean_forward_angle := -0.22       # how far forward Jerry pitches when leaning forward (cosmetic)
 @export var lean_forward_lateral_mult := 0.5  # sideways control is reduced to this fraction while leaning forward
 @export var lean_forward_recovery_yaw := 0.05 # alignment tolerance during lean-forward recovery
-@export var lean_back_angle := 0.22           # how far back Jerry leans when braking (cosmetic)
+@export var lean_back_angle := 0.22           # how far back Jerry leans when braking on the ground (cosmetic)
+@export var air_lean_back_angle := 0.22       # how far back Jerry leans when holding lean-back in the air (cosmetic)
+@export var lean_back_landing_bonus_deg := 20.0 # extra spin-angle forgiveness when leaning back at landing
+@export var lean_back_tilt_factor := 1.4      # land_tilt_wipeout is multiplied by this when leaning back at landing
 @export var lean_back_brake := 8.0            # braking force when holding lean back
 @export var lean_back_max_reverse := 2.0      # maximum reverse speed when fully braked
 @export var lean_back_recover_rate := 10.0    # how fast Jerry gets back to base speed after braking
@@ -235,6 +238,8 @@ func _physics_process(delta: float) -> void:
 			pitch_target = lean_forward_angle
 		elif _is_leaning_back:
 			pitch_target = lean_back_angle
+		elif not is_on_floor() and Input.is_action_pressed("lean_back"):
+			pitch_target = air_lean_back_angle
 		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, pitch_target, 10.0 * delta)
 		var squat_y := lerpf(_squat_root.scale.y, lerpf(1.0, charge_squat_scale, _charge_timer / charge_max_time), 12.0 * delta)
 		_squat_root.scale = Vector3(1.0, squat_y, 1.0)
@@ -328,6 +333,7 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 
 	# — Air yaw danger: live preview of how badly you'd overshoot a clean landing —
 	if not is_on_floor() and _air_time >= min_trick_air_time:
+		var leaning_back_preview := Input.is_action_pressed("lean_back")
 		var spin := absf(_air_spin_y)
 		if spin >= min_trick_spin:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
@@ -338,13 +344,16 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 				lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
 				deg_to_rad(crash_threshold_big_air_deg),
 				air_factor)
+			if leaning_back_preview:
+				crash_threshold += deg_to_rad(lean_back_landing_bonus_deg)
 			var yaw_intensity := clampf((residual - stomp_threshold) / (crash_threshold - stomp_threshold), 0.0, 1.0)
 			if yaw_intensity > best_intensity:
 				best_intensity = yaw_intensity
 				best_reason = WipeoutReason.AIR_YAW
 
 		# — Air tilt danger: live preview of landing-tilt wipeout risk —
-		var tilt_intensity := clampf(absf(_lean_vel_x) / land_tilt_wipeout, 0.0, 1.0)
+		var tilt_limit_preview := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_preview else 1.0)
+		var tilt_intensity := clampf(absf(_lean_vel_x) / tilt_limit_preview, 0.0, 1.0)
 		if tilt_intensity > best_intensity:
 			best_intensity = tilt_intensity
 			best_reason = WipeoutReason.AIR_TILT
@@ -443,6 +452,7 @@ func _handle_landing() -> void:
 		SfxManager.play_landing()
 		if not _is_on_rail():
 			_snow_particles.restart()
+		var leaning_back_on_land := Input.is_action_pressed("lean_back")
 		var spin := absf(_air_spin_y)
 		if _air_time >= min_trick_air_time and spin >= min_trick_spin:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
@@ -453,6 +463,8 @@ func _handle_landing() -> void:
 				lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
 				deg_to_rad(crash_threshold_big_air_deg),
 				air_factor)
+			if leaning_back_on_land:
+				crash_threshold += deg_to_rad(lean_back_landing_bonus_deg)
 			if overshoot >= crash_threshold:
 				_air_spin_y = 0.0
 				_air_time = 0.0
@@ -466,7 +478,8 @@ func _handle_landing() -> void:
 				GameManager.current_speed = maxf(GameManager.current_speed - sloppy_speed_penalty, GameManager.BASE_SPEED)
 			else:
 				ScoreManager.add_trick(true)
-		if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= land_tilt_wipeout:
+		var tilt_limit := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_on_land else 1.0)
+		if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= tilt_limit:
 			_air_spin_y = 0.0
 			_air_time = 0.0
 			_start_wipeout()
