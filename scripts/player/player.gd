@@ -1,5 +1,7 @@
 extends CharacterBody3D
 
+const LevelGenerator = preload("res://scripts/world/level_generator.gd")
+
 # ── Feel parameters — tunable in Inspector ───────────────────────────────────
 @export var lateral_accel := 22.0               # how quickly Jerry builds up sideways speed when leaning
 @export var lateral_friction := 16.0            # how quickly sideways drift slows down when not leaning
@@ -7,6 +9,7 @@ extends CharacterBody3D
 @export var max_lateral_speed := 13.0           # maximum speed Jerry can move sideways
 @export var lean_max_lateral := 3.5             # how much the lean keys (A/D) contribute to sideways speed
 @export var jump_velocity := 8.0                # how high Jerry jumps (uncharged)
+@export var ramp_jump_factor := 0.8            # how much ramp steepness × speed boosts the jump
 @export var charge_max_time := 0.6              # how long to hold down to reach full charge (seconds)
 @export var charge_jump_boost := 7.0            # extra jump height added at full charge
 @export var charge_release_window := 0.1        # seconds after releasing down where a charged jump still fires
@@ -19,6 +22,8 @@ extends CharacterBody3D
 @export var conflict_decay_rate := 2.0          # how fast the conflict warning clears when you stop opposing
 @export var crash_threshold_slow_deg := 75.0    # at slow speed, you can land this many degrees off-center before wiping out
 @export var crash_threshold_fast_deg := 45.0    # at top speed, you must be within this many degrees to land clean
+@export var crash_threshold_big_air_deg := 22.0 # after a big air, must be this close to straight to survive
+@export var big_air_time := 1.0                 # air time (seconds) at which full big-air tightening kicks in
 @export var wipeout_lateral_decel := 30.0       # how fast Jerry's sideways slide stops during a wipeout
 @export var lean_tilt_visual_scale := 0.28      # how much Jerry's body visually tilts when you lean (cosmetic)
 @export var lean_vel_tilt_visual_scale := 0.016 # extra tilt based on how fast Jerry is actually moving sideways (cosmetic)
@@ -77,12 +82,14 @@ enum WipeoutReason { NONE, CONFLICT, AIR_YAW, AIR_TILT }
 
 signal stance_changed(goofy: bool)
 signal wipeout_danger(intensity: float, reason: WipeoutReason)
+signal nice_air(air_time: float)
 
 var is_goofy: bool = false
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
 var _air_time: float = 0.0
+var _nice_air_shown: bool = false
 var _is_wiping_out: bool = false
 var _wipeout_timer: float = 0.0
 var _rail_spin_acc: float = 0.0
@@ -164,6 +171,9 @@ func _physics_process(delta: float) -> void:
 
 	if not is_on_floor():
 		_air_time += delta
+		if _air_time >= big_air_time and not _nice_air_shown:
+			nice_air.emit(_air_time)
+			_nice_air_shown = true
 
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
@@ -323,7 +333,11 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
 			var residual := absf(spin - nearest_n * PI)
 			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
-			var crash_threshold := lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio)
+			var air_factor := clampf(_air_time / big_air_time, 0.0, 1.0)
+			var crash_threshold := lerpf(
+				lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
+				deg_to_rad(crash_threshold_big_air_deg),
+				air_factor)
 			var yaw_intensity := clampf((residual - stomp_threshold) / (crash_threshold - stomp_threshold), 0.0, 1.0)
 			if yaw_intensity > best_intensity:
 				best_intensity = yaw_intensity
@@ -381,7 +395,10 @@ func _fire_jump() -> void:
 	var boost := _charge_amount * charge_jump_boost if _charge_release_window_timer > 0.0 else 0.0
 	_charge_amount = 0.0
 	_charge_release_window_timer = 0.0
-	velocity.y = jump_velocity + boost
+	var base_slope_z := sin(deg_to_rad(LevelGenerator.DOWNHILL_TILT_ANGLE))
+	var ramp_z_excess := clampf(get_floor_normal().z - base_slope_z, 0.0, 1.0)
+	var ramp_boost := ramp_z_excess * GameManager.current_speed * ramp_jump_factor
+	velocity.y = jump_velocity + boost + ramp_boost
 	if _is_on_rail() or abs(get_floor_normal().x) > WALL_NORMAL_THRESHOLD:
 		var dir := Input.get_axis("lean_left", "lean_right")
 		velocity.x = dir * max_lateral_speed * rail_jump_lateral_factor
@@ -431,7 +448,11 @@ func _handle_landing() -> void:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
 			var overshoot := absf(spin - nearest_n * PI)
 			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
-			var crash_threshold := lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio)
+			var air_factor := clampf(_air_time / big_air_time, 0.0, 1.0)
+			var crash_threshold := lerpf(
+				lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
+				deg_to_rad(crash_threshold_big_air_deg),
+				air_factor)
 			if overshoot >= crash_threshold:
 				_air_spin_y = 0.0
 				_air_time = 0.0
@@ -465,6 +486,7 @@ func _handle_landing() -> void:
 		_air_time = 0.0
 	elif not on_floor and _was_on_floor:
 		SfxManager.play_airborne()
+		_nice_air_shown = false
 	_was_on_floor = on_floor
 
 

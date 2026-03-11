@@ -17,6 +17,9 @@ var _goofy_time: float = 0.0
 var _is_goofy: bool = false
 var _danger_label: Label
 var _danger_vignette: ColorRect
+var _nice_air_label: Label
+var _nice_air_time: float = 0.0
+var _player: Node
 var _level_label: Label
 var _skip_btn: Button
 var _now_playing_label: Label
@@ -102,10 +105,27 @@ func _ready() -> void:
 	MusicManager.song_changed.connect(_on_song_changed)
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	GameManager.state_changed.connect(_on_state_changed)
-	var player := get_tree().get_first_node_in_group("player")
-	if player:
-		player.stance_changed.connect(_on_stance_changed)
-		player.wipeout_danger.connect(_on_wipeout_danger)
+	_nice_air_label = Label.new()
+	_nice_air_label.text = "nice air!"
+	_nice_air_label.visible = false
+	_nice_air_label.add_theme_font_size_override("font_size", 28)
+	_nice_air_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_nice_air_label.anchor_left = 0.5
+	_nice_air_label.anchor_right = 0.5
+	_nice_air_label.anchor_top = 0.5
+	_nice_air_label.anchor_bottom = 0.5
+	_nice_air_label.offset_left = -100.0
+	_nice_air_label.offset_right = 100.0
+	_nice_air_label.offset_top = -20.0
+	_nice_air_label.offset_bottom = 20.0
+	_nice_air_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_nice_air_label)
+
+	_player = get_tree().get_first_node_in_group("player")
+	if _player:
+		_player.stance_changed.connect(_on_stance_changed)
+		_player.wipeout_danger.connect(_on_wipeout_danger)
+		_player.nice_air.connect(_on_nice_air)
 	call_deferred("_connect_level_generator")
 	_on_state_changed(GameManager.state)
 
@@ -121,6 +141,18 @@ func _process(delta: float) -> void:
 		_goofy_time += delta
 		_goofy_label.position.x = sin(_goofy_time * 27.0) * 6.0
 		_goofy_label.position.y = sin(_goofy_time * 19.0) * 4.0
+
+	if _nice_air_label.visible:
+		_nice_air_time += delta
+		var wx := sin(_nice_air_time * 31.0) * 5.0
+		var wy := sin(_nice_air_time * 23.0) * 4.0
+		_nice_air_label.offset_left = -100.0 + wx
+		_nice_air_label.offset_right =  100.0 + wx
+		_nice_air_label.offset_top  =  -20.0 + wy
+		_nice_air_label.offset_bottom =  20.0 + wy
+		if is_instance_valid(_player) and _player.is_on_floor():
+			_nice_air_label.visible = false
+			_nice_air_time = 0.0
 
 	if GameManager.state == GameManager.State.PLAYING:
 		_elapsed += delta
@@ -204,6 +236,13 @@ func _on_level_changed(level_name: String, level_number: int) -> void:
 
 func _on_try_again_pressed() -> void:
 	GameManager.start_game()
+
+
+func _on_nice_air(_air_time: float) -> void:
+	if GameManager.state != GameManager.State.PLAYING:
+		return
+	_nice_air_time = 0.0
+	_nice_air_label.visible = true
 
 
 func _on_song_changed(song_name: String) -> void:
