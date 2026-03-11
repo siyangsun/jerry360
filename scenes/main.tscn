@@ -26,7 +26,7 @@ albedo_color = Color(0.18, 0.18, 0.18, 1)
 roughness = 1.0
 
 [sub_resource type="BoxMesh" id="BoxMesh_board"]
-size = Vector3(0.55, 0.08, 1.2)
+size = Vector3(0.55, 0.08, 1.44)
 material = SubResource("Mat_board")
 
 [sub_resource type="CapsuleShape3D" id="Capsule_player"]
