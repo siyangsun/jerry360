@@ -1,10 +1,11 @@
 extends FogVolume
 
+const LevelGenerator = preload("res://scripts/world/level_generator.gd")
+
 const NORMAL_FOG_RADIUS  := 15000.0  # clear bubble radius during normal/steep runs (effectively no fog)
 const NORMAL_FOG_FALLOFF := 0.02     # fog density per unit past the bubble during normal runs
 const FOGGY_FOG_RADIUS   := 80.0     # clear bubble radius during foggy runs (fog starts close)
 const FOGGY_FOG_FALLOFF  := 0.05     # fog density per unit during foggy runs (thickens faster)
-
 var _player: Node3D
 
 
