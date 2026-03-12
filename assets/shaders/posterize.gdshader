@@ -32,8 +32,8 @@ void fragment() {
 		float is_line = has_line * step(seg_frac, line_width);
 
 		// Each line has its own inner and outer radius — randomized length
-		float inner_r = mix(0.10, 0.22, h2);
-		float outer_r = inner_r + mix(0.18, 0.50, h3);
+		float inner_r = mix(0.20, 0.35, h2);
+		float outer_r = inner_r + mix(0.35, 0.65, h3);
 		float radial = smoothstep(inner_r, inner_r + 0.02, radius)
 		             * (1.0 - smoothstep(outer_r - 0.02, outer_r, radius));
 
