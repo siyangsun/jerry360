@@ -65,6 +65,14 @@ func return_to_menu() -> void:
 	_set_state(State.MENU)
 
 
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		if state == State.PLAYING:
+			pause_game()
+		elif state == State.PAUSED:
+			resume_game()
+
+
 func _process(delta: float) -> void:
 	if state != State.PLAYING:
 		return
