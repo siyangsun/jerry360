@@ -3,7 +3,22 @@ extends CanvasLayer
 @onready var distance_label: Label = $DistanceLabel
 @onready var death_screen: Control = $DeathScreen
 @onready var death_label: Label = $DeathScreen/DeathLabel
+@onready var _death_overlay: ColorRect = $DeathScreen/GrayOverlay
 @onready var menu_screen: Control = $MenuScreen
+@onready var _controls_screen: Control = $ControlsScreen
+
+const SCREEN_OVERLAY_COLOR := Color(0.15, 0.15, 0.15, 0.3)
+
+const CONTROLS_DATA: Array[Dictionary] = [
+	{"key": "← →",        "desc": "Steer the board left and right"},
+	{"key": "A / D",       "desc": "Lean — shifts weight sideways and carves"},
+	{"key": "Space / ↑",   "desc": "Jump"},
+	{"key": "↓  (hold)",   "desc": "Charge a jump — release to launch higher"},
+	{"key": "W  (hold)",   "desc": "Lean forward — accelerate past top speed"},
+	{"key": "S  (hold)",   "desc": "Lean back — brake on the ground, or prep for landing"},
+	{"key": "← → (air)",  "desc": "Spin tricks — land straight to score and boost"},
+	{"key": "Esc",         "desc": "Pause"},
+]
 
 const LAP_DISTANCE := 1000.0
 
@@ -126,8 +141,66 @@ func _ready() -> void:
 		_player.stance_changed.connect(_on_stance_changed)
 		_player.wipeout_danger.connect(_on_wipeout_danger)
 		_player.nice_air.connect(_on_nice_air)
+	_death_overlay.color = SCREEN_OVERLAY_COLOR
+	_build_controls_screen()
 	call_deferred("_connect_level_generator")
 	_on_state_changed(GameManager.state)
+
+
+func _build_controls_screen() -> void:
+	var overlay := ColorRect.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.color = SCREEN_OVERLAY_COLOR
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_controls_screen.add_child(overlay)
+
+	var title := Label.new()
+	title.text = "HOW TO PLAY"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.anchor_left = 0.0
+	title.anchor_right = 1.0
+	title.anchor_top = 0.06
+	title.anchor_bottom = 0.18
+	title.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1, 1))
+	_controls_screen.add_child(title)
+
+	var list := VBoxContainer.new()
+	list.anchor_left = 0.1
+	list.anchor_right = 0.9
+	list.anchor_top = 0.20
+	list.anchor_bottom = 0.85
+	list.add_theme_constant_override("separation", 10)
+	_controls_screen.add_child(list)
+
+	for entry in CONTROLS_DATA:
+		var row := HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var key_label := Label.new()
+		key_label.text = entry["key"]
+		key_label.custom_minimum_size.x = 160
+		key_label.add_theme_font_size_override("font_size", 16)
+		key_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1, 1))
+		row.add_child(key_label)
+
+		var desc_label := Label.new()
+		desc_label.text = entry["desc"]
+		desc_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		desc_label.add_theme_font_size_override("font_size", 16)
+		row.add_child(desc_label)
+
+		list.add_child(row)
+
+	var back_btn := Button.new()
+	back_btn.text = "< Back"
+	back_btn.anchor_left = 0.38
+	back_btn.anchor_right = 0.62
+	back_btn.anchor_top = 0.88
+	back_btn.anchor_bottom = 0.96
+	back_btn.pressed.connect(_on_controls_back_pressed)
+	_controls_screen.add_child(back_btn)
 
 
 func _connect_level_generator() -> void:
@@ -180,6 +253,7 @@ func _on_combo_changed(count: int, multiplier: float) -> void:
 
 func _on_state_changed(new_state: GameManager.State) -> void:
 	menu_screen.visible = new_state == GameManager.State.MENU
+	_controls_screen.visible = false
 	death_screen.visible = new_state == GameManager.State.DEAD
 	distance_label.visible = new_state == GameManager.State.PLAYING
 	_level_label.visible = new_state == GameManager.State.PLAYING
@@ -223,6 +297,16 @@ func _on_wipeout_danger(intensity: float, reason: int) -> void:
 		3: _danger_label.text = "LEVEL OUT"   # AIR_TILT
 	_danger_label.add_theme_color_override("font_color", Color(1.0, 1.0 - intensity, 0.0))
 	_danger_vignette.color = Color(1.0, 0.0, 0.0, intensity * 0.18)
+
+
+func _on_how_to_play_pressed() -> void:
+	menu_screen.visible = false
+	_controls_screen.visible = true
+
+
+func _on_controls_back_pressed() -> void:
+	_controls_screen.visible = false
+	menu_screen.visible = true
 
 
 func _on_start_pressed() -> void:

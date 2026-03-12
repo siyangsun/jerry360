@@ -10,8 +10,6 @@
 - controls page
 - heavily increased fog along lateral axis
 - effects for going super fast
-- text like "nice air" and stuff
-- big jumps are less forgiving on landing straight. should lean back before landing too
 
 ### blue sky
 - multiple levels; alternate game modes (time trial vs. trick scoring vs. infinite survival)
