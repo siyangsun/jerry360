@@ -26,6 +26,7 @@ const SPEED_FOV_BOOST := 12.0  # extra field of view added at top speed (makes i
 const AIR_CAM_LIFT    := 1.4   # camera rises when Jerry is in the air so you can see the landing
 const SLOPE_LOOK_Y_MULT := 0.1  # how much the look target drops per degree of slope (pushes horizon up)
 
+
 var _prev_speed := 0.0
 var _accel_drop := 0.0
 var _vel_lean := 0.0
