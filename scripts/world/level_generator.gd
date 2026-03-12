@@ -46,6 +46,18 @@ const BUSH_HEIGHT := 1.5         # how tall each bush is
 const BUSH_SINK := 0.2           # how far the base dips into the floor
 const BUSH_CLUSTER_SPREAD := 2.0 # how spread out bushes are within a cluster
 
+# Rock crystals (crags only)
+const ROCK_SEGMENTS := 6                       # hexagonal prism cross-section
+const ROCK_RADIUS_MIN := 0.7                   # thinnest crystal radius
+const ROCK_RADIUS_MAX := 1.8                   # widest crystal radius
+const ROCK_BODY_HEIGHT_FACTOR := 1.8           # prism body height = radius * this
+const ROCK_CAP_HEIGHT_FACTOR := 1.1            # pointed cap height = radius * this
+const ROCK_SINK := 0.6                         # how far the base sits below ground level
+const ROCK_TILT_X_MAX := 0.45                  # max random forward/back tilt (radians)
+const ROCK_TILT_Z_MAX := 0.35                  # max random side tilt (radians)
+const ROCK_CLUSTER_SPREAD := 3.5              # how spread out crystals are within a clump
+const ROCK_COLOR := Color(0.16, 0.17, 0.20)    # cool dark gray with slight blue cast
+
 # Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
 const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
 
@@ -79,23 +91,28 @@ const RAIL_RAMP_GAP := 0.1         # small gap between the ramp top and the flat
 # ── Level configs ─────────────────────────────────────────────────────────────
 # Each level: name, chunks before advancing, and obstacle spawn weights.
 # Weights are evaluated in order (tree → rail → mogul → ramp); remaining roll = empty slot.
-const EMPTY_LEVEL := { "tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0 }
+const EMPTY_LEVEL := { "tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0 }
 
 const LEVELS := [
 	{
 		"name": "THE PARK",
 		"chunks": 5,
-		"tree": 0.05, "rail": 0.40, "mogul": 0.00, "ramp": 0.40, "bush": 0.00,
+		"tree": 0.05, "rail": 0.40, "mogul": 0.00, "ramp": 0.40, "bush": 0.00, "rock": 0.00,
 	},
 	{
 		"name": "THE RUNS",
 		"chunks": 5,
-		"tree": 0.05, "rail": 0.10, "mogul": 0.55, "ramp": 0.10, "bush": 0.00,
+		"tree": 0.05, "rail": 0.10, "mogul": 0.55, "ramp": 0.10, "bush": 0.00, "rock": 0.00,
 	},
 	{
 		"name": "THE GLADES",
 		"chunks": 5,
-		"tree": 0.35, "rail": 0.08, "mogul": 0.10, "ramp": 0.03, "bush": 0.20,
+		"tree": 0.35, "rail": 0.08, "mogul": 0.10, "ramp": 0.03, "bush": 0.20, "rock": 0.00,
+	},
+	{
+		"name": "THE CRAGS",
+		"chunks": 5,
+		"tree": 0.18, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.60,
 	},
 ]
 
@@ -239,6 +256,10 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 			var max_offset := FLOOR_WIDTH * 0.5 - BUSH_RADIUS - 0.5
 			var bx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_bush_cluster(Vector3(bx, 0.0, z)))
+		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock:
+			var max_offset := FLOOR_WIDTH * 0.5 - ROCK_RADIUS_MAX - 0.5
+			var rx := randf_range(-max_offset, max_offset)
+			root.add_child(_make_rock_cluster(Vector3(rx, 0.0, z)))
 		z -= RAMP_SLOT_SPACING
 
 
@@ -646,6 +667,76 @@ func _make_bush_mesh() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+func _make_rock_cluster(center: Vector3) -> Node3D:
+	var cluster := Node3D.new()
+	cluster.position = center
+	var count := randi_range(1, 5)
+	for i in range(count):
+		var ox := randf_range(-ROCK_CLUSTER_SPREAD, ROCK_CLUSTER_SPREAD)
+		var oz := randf_range(-ROCK_CLUSTER_SPREAD, ROCK_CLUSTER_SPREAD)
+		cluster.add_child(_make_rock_crystal(Vector3(ox, 0.0, oz)))
+	return cluster
+
+
+func _make_rock_crystal(pos: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+	root.rotation.y = randf() * TAU
+	root.rotation.x = randf_range(-ROCK_TILT_X_MAX, ROCK_TILT_X_MAX)
+	root.rotation.z = randf_range(-ROCK_TILT_Z_MAX, ROCK_TILT_Z_MAX)
+	root.rotation.x += deg_to_rad(_active_tilt_angle)
+
+	var radius  := randf_range(ROCK_RADIUS_MIN, ROCK_RADIUS_MAX)
+	var body_h  := radius * ROCK_BODY_HEIGHT_FACTOR
+	var cap_h   := radius * ROCK_CAP_HEIGHT_FACTOR
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = ROCK_COLOR
+	mat.roughness = 0.90
+	mat.metallic = 0.0
+
+	# Hexagonal prism body
+	var body_cyl := CylinderMesh.new()
+	body_cyl.top_radius = radius
+	body_cyl.bottom_radius = radius
+	body_cyl.height = body_h
+	body_cyl.radial_segments = ROCK_SEGMENTS
+	var body_mesh := MeshInstance3D.new()
+	body_mesh.mesh = body_cyl
+	body_mesh.material_override = mat
+	body_mesh.position.y = body_h * 0.5 - ROCK_SINK
+	root.add_child(body_mesh)
+
+	# Pointed cap
+	var cap_cyl := CylinderMesh.new()
+	cap_cyl.top_radius = 0.0
+	cap_cyl.bottom_radius = radius
+	cap_cyl.height = cap_h
+	cap_cyl.radial_segments = ROCK_SEGMENTS
+	var cap_mesh := MeshInstance3D.new()
+	cap_mesh.mesh = cap_cyl
+	cap_mesh.material_override = mat
+	cap_mesh.position.y = body_h + cap_h * 0.5 - ROCK_SINK
+	root.add_child(cap_mesh)
+
+	# Crash area
+	var area := Area3D.new()
+	var area_col := CollisionShape3D.new()
+	var area_shape := CylinderShape3D.new()
+	area_shape.radius = radius
+	area_shape.height = body_h + cap_h
+	area_col.shape = area_shape
+	area_col.position.y = (body_h + cap_h) * 0.5 - ROCK_SINK
+	area.add_child(area_col)
+	area.body_entered.connect(func(body: Node3D) -> void:
+		if body.has_method("crash"):
+			body.crash()
+	)
+	root.add_child(area)
+
+	return root
 
 
 func _make_lap_marker() -> MeshInstance3D:
