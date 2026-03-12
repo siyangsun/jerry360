@@ -61,12 +61,14 @@ const ROCK_COLOR := Color(0.16, 0.17, 0.20)    # cool dark gray with slight blue
 # Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
 const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
 
-# Lap variants — each lap rolls one of: regular, misty, steep
+# Lap variants — each lap rolls one of: regular, misty, steep, clear
 const VARIANT_REGULAR := "regular"
 const VARIANT_MISTY   := "misty"
 const VARIANT_STEEP   := "steep"
-const VARIANT_MISTY_CHANCE := 0.25  # probability of a misty lap
-const VARIANT_STEEP_CHANCE := 0.25  # probability of a steep lap (remaining roll = regular)
+const VARIANT_CLEAR   := "clear"
+const VARIANT_MISTY_CHANCE   := 0.30  # probability of a misty lap
+const VARIANT_STEEP_CHANCE   := 0.20  # probability of a steep lap
+const VARIANT_CLEAR_CHANCE   := 0.30  # probability of a clear lap (remaining roll = regular)
 const STEEP_TILT_ANGLE := 30.0      # tree tilt on steep runs (degrees)
 
 # Trees
@@ -785,6 +787,8 @@ func _pick_variant() -> void:
 		_active_variant = VARIANT_MISTY
 	elif roll < VARIANT_MISTY_CHANCE + VARIANT_STEEP_CHANCE:
 		_active_variant = VARIANT_STEEP
+	elif roll < VARIANT_MISTY_CHANCE + VARIANT_STEEP_CHANCE + VARIANT_CLEAR_CHANCE:
+		_active_variant = VARIANT_CLEAR
 	else:
 		_active_variant = VARIANT_REGULAR
 	_active_tilt_angle = STEEP_TILT_ANGLE if _active_variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
@@ -795,8 +799,9 @@ func _pick_variant() -> void:
 func _make_display_name(base: String) -> String:
 	# Inserts the variant prefix after "THE " — e.g. "THE MISTY PARK", "THE STEEP RUNS"
 	match _active_variant:
-		VARIANT_MISTY: return "THE MISTY " + base.substr(4)
-		VARIANT_STEEP: return "THE STEEP " + base.substr(4)
+		VARIANT_MISTY:  return "THE MISTY " + base.substr(4)
+		VARIANT_STEEP:  return "THE STEEP " + base.substr(4)
+		VARIANT_CLEAR:  return "THE CLEAR " + base.substr(4)
 		_: return base
 
 

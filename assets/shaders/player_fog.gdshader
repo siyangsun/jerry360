@@ -11,4 +11,5 @@ void fog() {
 	float ellipsoid_r = length(vec3(diff.x, diff.y, diff.z / depth_scale)) / fog_radius;
 	DENSITY = max(0.0, ellipsoid_r - 1.0) * fog_falloff;
 	ALBEDO = fog_albedo;
+	EMISSION = fog_albedo * 0.4;
 }

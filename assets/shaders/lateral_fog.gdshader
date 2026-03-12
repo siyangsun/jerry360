@@ -12,4 +12,5 @@ void fog() {
 	float dist = max(0.0, abs(WORLD_POSITION.x) - effective_boundary);
 	DENSITY = dist * boundary_falloff;
 	ALBEDO = fog_albedo;
+	EMISSION = fog_albedo * 0.4;
 }

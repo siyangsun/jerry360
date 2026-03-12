@@ -2,10 +2,12 @@ extends FogVolume
 
 const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 
-const NORMAL_FOG_RADIUS  := 15000.0  # clear bubble radius during normal/steep runs (effectively no fog)
-const NORMAL_FOG_FALLOFF := 0.02     # fog density per unit past the bubble during normal runs
-const FOGGY_FOG_RADIUS   := 80.0     # clear bubble radius during foggy runs (fog starts close)
-const FOGGY_FOG_FALLOFF  := 0.05     # fog density per unit during foggy runs (thickens faster)
+const CLEAR_FOG_RADIUS   := 15000.0  # clear bubble radius during clear runs (effectively no fog)
+const CLEAR_FOG_FALLOFF  := 0.02     # fog density per unit during clear runs
+const NORMAL_FOG_RADIUS  := 11.0     # clear bubble radius during normal runs (light fog in distance)
+const NORMAL_FOG_FALLOFF := 0.17     # fog density per unit during normal runs
+const FOGGY_FOG_RADIUS   := 3.0      # clear bubble radius during foggy runs (fog starts very close)
+const FOGGY_FOG_FALLOFF  := 0.15     # fog density per unit during foggy runs (thickens fast)
 var _player: Node3D
 
 
@@ -28,6 +30,9 @@ func _on_variant_changed(variant: String) -> void:
 	if variant == "misty":
 		mat.set_shader_parameter("fog_radius", FOGGY_FOG_RADIUS)
 		mat.set_shader_parameter("fog_falloff", FOGGY_FOG_FALLOFF)
+	elif variant == "clear":
+		mat.set_shader_parameter("fog_radius", CLEAR_FOG_RADIUS)
+		mat.set_shader_parameter("fog_falloff", CLEAR_FOG_FALLOFF)
 	else:
 		mat.set_shader_parameter("fog_radius", NORMAL_FOG_RADIUS)
 		mat.set_shader_parameter("fog_falloff", NORMAL_FOG_FALLOFF)

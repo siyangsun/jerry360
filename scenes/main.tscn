@@ -34,8 +34,8 @@ radius = 0.3
 height = 1.0
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
-sky_top_color = Color(0.38, 0.6, 0.85, 1)
-sky_horizon_color = Color(0.7, 0.85, 1.0, 1)
+sky_top_color = Color(0.22, 0.50, 0.88, 1)
+sky_horizon_color = Color(0.55, 0.76, 1.0, 1)
 ground_bottom_color = Color(0.9, 0.95, 1.0, 1)
 
 [sub_resource type="Sky" id="Sky_1"]
