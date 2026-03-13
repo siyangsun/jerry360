@@ -38,6 +38,21 @@ var _player: Node
 var _level_label: Label
 var _skip_btn: Button
 var _now_playing_label: Label
+var _wife_label: Label
+var _woohoo_label: Label
+var _wife_audio: AudioStreamPlayer
+var _wow_label: Label
+var _wow_timer: float = 0.0
+var _wife_call_active: bool = false
+var _wife_call_timer: float = 0.0
+var _wife_kill_timer: float = 0.0
+var _woohoo_timer: float = 0.0
+
+@export var fun_rate_wow_threshold: float = 20.0
+@export var wow_display_time: float = 3.0
+@export var wife_call_display_time: float = 3.5
+@export var wife_kill_delay: float = 3.0
+@export var woohoo_display_time: float = 2.0
 
 
 func _ready() -> void:
@@ -117,9 +132,55 @@ func _ready() -> void:
 	_skip_btn.pressed.connect(MusicManager.skip_song)
 	add_child(_skip_btn)
 
+	_wow_label = Label.new()
+	_wow_label.text = "wow this is fun!"
+	_wow_label.add_theme_font_size_override("font_size", 18)
+	_wow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wow_label.visible = false
+	add_child(_wow_label)
+
+	var serif_font := SystemFont.new()
+	serif_font.font_names = PackedStringArray(["Georgia", "Times New Roman", "Times", "serif"])
+
+	_wife_label = Label.new()
+	_wife_label.text = "Hi honey, are you having fun?"
+	_wife_label.add_theme_font_size_override("font_size", 20)
+	_wife_label.add_theme_font_override("font", serif_font)
+	_wife_label.add_theme_color_override("font_color", Color.BLACK)
+	_wife_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_wife_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_wife_label.anchor_left = 1.0
+	_wife_label.anchor_right = 1.0
+	_wife_label.anchor_top = 0.5
+	_wife_label.anchor_bottom = 0.5
+	_wife_label.offset_left = -316.0
+	_wife_label.offset_right = -16.0
+	_wife_label.offset_top = -40.0
+	_wife_label.offset_bottom = 40.0
+	_wife_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wife_label.visible = false
+	add_child(_wife_label)
+
+	_woohoo_label = Label.new()
+	_woohoo_label.text = "WOOHOO!!"
+	_woohoo_label.add_theme_font_size_override("font_size", 64)
+	_woohoo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_woohoo_label.anchor_left = 0.0
+	_woohoo_label.anchor_right = 1.0
+	_woohoo_label.anchor_top = 0.35
+	_woohoo_label.anchor_bottom = 0.55
+	_woohoo_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_woohoo_label.visible = false
+	add_child(_woohoo_label)
+
+	_wife_audio = AudioStreamPlayer.new()
+	_wife_audio.stream = load("res://assets/audio/are_you_having_fun.mp3")
+	add_child(_wife_audio)
+
 	MusicManager.song_changed.connect(_on_song_changed)
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	GameManager.state_changed.connect(_on_state_changed)
+	GameManager.wife_calling.connect(_on_wife_calling)
 	_nice_air_label = Label.new()
 	_nice_air_label.text = "nice air!"
 	_nice_air_label.visible = false
@@ -227,6 +288,17 @@ func _process(delta: float) -> void:
 			_nice_air_label.visible = false
 			_nice_air_time = 0.0
 
+	if _wow_label.visible:
+		if _wow_timer > 0.0:
+			_wow_timer -= delta
+			if _wow_timer <= 0.0:
+				_wow_label.visible = false
+		if is_instance_valid(_player):
+			var cam := get_viewport().get_camera_3d()
+			if cam:
+				var screen_pos := cam.unproject_position(_player.global_position + Vector3(0, 2.2, 0))
+				_wow_label.position = screen_pos + Vector2(-_wow_label.size.x * 0.5, 0.0)
+
 	if GameManager.state == GameManager.State.PLAYING:
 		_elapsed += delta
 		_lap_time += delta
@@ -241,6 +313,23 @@ func _process(delta: float) -> void:
 		if _best_lap < INF:
 			best_str = "%d:%02d" % [int(_best_lap) / 60, int(_best_lap) % 60]
 		distance_label.text = "%.0f m\n%.0f m/s\n%d:%02d\nBest %s\nfun had: %.0f" % [ScoreManager.distance, GameManager.current_speed, mins, secs, best_str, ScoreManager.fun]
+
+		if _wow_timer <= 0.0 and ScoreManager.fun_rate > fun_rate_wow_threshold:
+			_wow_timer = wow_display_time
+			_wow_label.visible = true
+
+		if _wife_call_active:
+			_wife_call_timer -= delta
+			if _wife_call_timer <= 0.0:
+				_resolve_wife_call()
+		if _wife_kill_timer > 0.0:
+			_wife_kill_timer -= delta
+			if _wife_kill_timer <= 0.0:
+				GameManager.commit_wife_kill()
+		if _woohoo_timer > 0.0:
+			_woohoo_timer -= delta
+			if _woohoo_timer <= 0.0:
+				_woohoo_label.visible = false
 
 
 func _on_combo_changed(count: int, multiplier: float) -> void:
@@ -264,18 +353,31 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_goofy_label.visible = false
 		_danger_label.visible = false
 		_danger_vignette.color.a = 0.0
+		_wife_label.visible = false
+		_woohoo_label.visible = false
+		_wow_label.visible = false
+		_wife_call_active = false
+		_wife_kill_timer = 0.0
+		_wow_timer = 0.0
 
 	if new_state == GameManager.State.PLAYING:
 		_elapsed = 0.0
 		_lap_time = 0.0
 		_next_lap_dist = LAP_DISTANCE
+		_wife_call_active = false
+		_wife_call_timer = 0.0
+		_wife_kill_timer = 0.0
+		_woohoo_timer = 0.0
 
 	if new_state == GameManager.State.DEAD:
-		var dist := ScoreManager.distance
-		var best := ScoreManager.high_score
-		var deaths := ScoreManager.deaths
-		var first_line := "Got a little too goofy." if _is_goofy else "He fell."
-		death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, best, deaths]
+		if GameManager.wife_killed_jerry:
+			death_label.text = "should probably get on linkedin"
+		else:
+			var dist := ScoreManager.distance
+			var best := ScoreManager.high_score
+			var deaths := ScoreManager.deaths
+			var first_line := "Got a little too goofy." if _is_goofy else "He fell."
+			death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, best, deaths]
 
 
 func _on_stance_changed(goofy: bool) -> void:
@@ -331,3 +433,22 @@ func _on_nice_air(_air_time: float) -> void:
 
 func _on_song_changed(song_name: String) -> void:
 	_now_playing_label.text = "now playing\n" + song_name
+
+
+func _on_wife_calling() -> void:
+	_wife_call_active = true
+	_wife_call_timer = wife_call_display_time
+	_wife_label.visible = true
+	_wife_audio.play()
+
+
+func _resolve_wife_call() -> void:
+	_wife_call_active = false
+	var passed := GameManager.resolve_wife_call()
+	if passed:
+		_wife_label.visible = false
+		_woohoo_label.visible = true
+		_woohoo_timer = woohoo_display_time
+	else:
+		_wife_label.text = "No? Aww, I'm sorry. Dinner's ready soon!"
+		_wife_kill_timer = wife_kill_delay

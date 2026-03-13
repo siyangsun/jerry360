@@ -19,8 +19,19 @@ const STEEP_RAMP_RATE_BONUS := 0.3
 var active_max_speed: float = MAX_SPEED
 var active_speed_ramp_rate: float = SPEED_RAMP_RATE
 
+@export var wife_call_interval: float = 60.0
+@export var wife_call_base_threshold: float = 1500.0
+@export var wife_call_threshold_ramp: float = 2000.0
+
+var wife_killed_jerry: bool = false
+
+var _play_elapsed: float = 0.0
+var _call_minute: int = 0
+var _wife_call_pending: bool = false
+
 signal state_changed(new_state: State)
 signal speed_changed(new_speed: float)
+signal wife_calling()
 
 
 func _ready() -> void:
@@ -32,6 +43,10 @@ func start_game() -> void:
 	ramp_multiplier = 1.0
 	active_max_speed = MAX_SPEED
 	active_speed_ramp_rate = SPEED_RAMP_RATE
+	wife_killed_jerry = false
+	_play_elapsed = 0.0
+	_call_minute = 0
+	_wife_call_pending = false
 	_set_state(State.PLAYING)
 
 
@@ -79,6 +94,22 @@ func _process(delta: float) -> void:
 	if current_speed < active_max_speed:
 		current_speed = minf(current_speed + active_speed_ramp_rate * ramp_multiplier * delta, active_max_speed)
 		speed_changed.emit(current_speed)
+	_play_elapsed += delta
+	if not _wife_call_pending and _play_elapsed >= wife_call_interval * (_call_minute + 1):
+		_wife_call_pending = true
+		wife_calling.emit()
+
+
+func resolve_wife_call() -> bool:
+	_wife_call_pending = false
+	var threshold := wife_call_base_threshold + _call_minute * _call_minute * wife_call_threshold_ramp
+	_call_minute += 1
+	return ScoreManager.fun >= threshold
+
+
+func commit_wife_kill() -> void:
+	wife_killed_jerry = true
+	player_died()
 
 
 func _set_state(new_state: State) -> void:

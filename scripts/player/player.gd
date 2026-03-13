@@ -267,6 +267,7 @@ func _physics_process(delta: float) -> void:
 			_end_recovery()
 
 	var carve_intensity := clampf(absf(_lean_vel_x) / max_lateral_speed + absf(_board_yaw) / board_turn_max, 0.0, 1.0)
+	ScoreManager.is_goofy = is_goofy
 	ScoreManager.add_distance(GameManager.current_speed * delta)
 	ScoreManager.add_fun_continuous(GameManager.current_speed, delta, on_rail, carve_intensity)
 

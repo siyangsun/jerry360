@@ -6,14 +6,18 @@ var deaths: int = 0
 var combo_count: int = 0
 var combo_multiplier: float = 1.0
 var fun: float = 0.0
+var fun_rate: float = 0.0
+var is_goofy: bool = false
 
 const COMBO_MULT_PER_COUNT := 0.25  # score multiplier added per trick in a combo (stacks up)
 const COMBO_MAX_MULTIPLIER := 4.0   # highest possible score multiplier, no matter how big the combo
 
 @export var fun_speed_rate: float = 0.3         # fun per (m/s * second) — scales with speed and multiplier
-@export var fun_airtime_rate: float = 3.0       # fun per (air_seconds * speed) awarded on clean landing
+@export var fun_airtime_rate: float = 1.5       # fun per (air_seconds^airtime_exponent * speed) awarded on clean landing
+@export var fun_airtime_exponent: float = 2.0   # exponent on air_time — higher = short hops worth less, big air worth much more
 @export var fun_rail_rate_mult: float = 2.0     # fun rate multiplier while grinding a rail
 @export var fun_carve_rate_bonus: float = 0.5   # max additional fun rate when fully carving (added on top)
+@export var fun_goofy_mult: float = 1.5         # fun rate multiplier when riding goofy
 
 signal distance_updated(dist: float)
 signal new_high_score(dist: float)
@@ -31,6 +35,8 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.PLAYING:
 		distance = 0.0
 		fun = 0.0
+		fun_rate = 0.0
+		is_goofy = false
 		reset_combo()
 	elif new_state == GameManager.State.DEAD:
 		deaths += 1
@@ -46,12 +52,15 @@ func add_distance(delta_dist: float) -> void:
 func add_fun_continuous(speed: float, delta: float, on_rail: bool = false, carve_intensity: float = 0.0) -> void:
 	var rate_mult := fun_rail_rate_mult if on_rail else 1.0
 	rate_mult += carve_intensity * fun_carve_rate_bonus
-	fun += speed * fun_speed_rate * rate_mult * combo_multiplier * delta
+	if is_goofy:
+		rate_mult *= fun_goofy_mult
+	fun_rate = speed * fun_speed_rate * rate_mult * combo_multiplier
+	fun += fun_rate * delta
 	fun_updated.emit(fun)
 
 
 func add_fun_airtime(air_time: float, speed: float) -> void:
-	fun += air_time * speed * fun_airtime_rate * combo_multiplier
+	fun += pow(air_time, fun_airtime_exponent) * speed * fun_airtime_rate * combo_multiplier
 	fun_updated.emit(fun)
 
 
