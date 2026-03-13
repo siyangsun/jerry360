@@ -266,7 +266,9 @@ func _physics_process(delta: float) -> void:
 		elif _yaw_recovery:
 			_end_recovery()
 
+	var carve_intensity := clampf(absf(_lean_vel_x) / max_lateral_speed + absf(_board_yaw) / board_turn_max, 0.0, 1.0)
 	ScoreManager.add_distance(GameManager.current_speed * delta)
+	ScoreManager.add_fun_continuous(GameManager.current_speed, delta, on_rail, carve_intensity)
 
 
 # A/D: lean body, biases lateral velocity
@@ -495,6 +497,7 @@ func _handle_landing() -> void:
 		if abs(residual) >= boost_threshold:
 			_boost_multiplier = boost_amount
 			_boost_timer = boost_duration
+		ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed)
 		_air_spin_y = 0.0
 		_air_time = 0.0
 	elif not on_floor and _was_on_floor:

@@ -240,7 +240,7 @@ func _process(delta: float) -> void:
 		var best_str := "--:--"
 		if _best_lap < INF:
 			best_str = "%d:%02d" % [int(_best_lap) / 60, int(_best_lap) % 60]
-		distance_label.text = "%.0f m\n%.0f m/s\n%d:%02d\nBest %s" % [ScoreManager.distance, GameManager.current_speed, mins, secs, best_str]
+		distance_label.text = "%.0f m\n%.0f m/s\n%d:%02d\nBest %s\nfun had: %.0f" % [ScoreManager.distance, GameManager.current_speed, mins, secs, best_str, ScoreManager.fun]
 
 
 func _on_combo_changed(count: int, multiplier: float) -> void:
