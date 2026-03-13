@@ -70,6 +70,7 @@ const VARIANT_MISTY_CHANCE   := 0.30  # probability of a misty lap
 const VARIANT_STEEP_CHANCE   := 0.20  # probability of a steep lap
 const VARIANT_CLEAR_CHANCE   := 0.30  # probability of a clear lap (remaining roll = regular)
 const STEEP_TILT_ANGLE := 30.0      # tree tilt on steep runs (degrees)
+const NARROWS_FLOOR_WIDTH    := 8.0   # narrower riding surface for THE NARROWS level
 
 # Trees
 const TREE_TRUNK_RADIUS := 0.30    # how thick tree trunks are
@@ -116,6 +117,12 @@ const LEVELS := [
 		"chunks": 5,
 		"tree": 0.18, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.60,
 	},
+	{
+		"name": "THE NARROWS",
+		"chunks": 5,
+		"floor_width": NARROWS_FLOOR_WIDTH,
+		"tree": 0.12, "rail": 0.30, "mogul": 0.20, "ramp": 0.15, "bush": 0.00, "rock": 0.18,
+	},
 ]
 
 @export var chunk_scenes: Array[PackedScene] = []
@@ -133,6 +140,7 @@ var _last_player_chunk: int = 0
 # Current lap variant
 var _active_variant: String = VARIANT_REGULAR
 var _active_tilt_angle: float = DOWNHILL_TILT_ANGLE
+var _active_floor_width: float = FLOOR_WIDTH
 
 
 func _ready() -> void:
@@ -193,11 +201,12 @@ func _spawn_chunk() -> void:
 func _make_fallback_chunk(cfg: Dictionary) -> Node3D:
 	var root := Node3D.new()
 	root.name = "FallbackChunk"
+	_active_floor_width = cfg.get("floor_width", FLOOR_WIDTH)
 
 	var center_z := -CHUNK_LENGTH * 0.5
 
 	# Floor — wide and flat
-	var floor_size := Vector3(FLOOR_WIDTH, PANEL_THICKNESS, CHUNK_LENGTH)
+	var floor_size := Vector3(_active_floor_width, PANEL_THICKNESS, CHUNK_LENGTH)
 	root.add_child(_make_panel(
 		Vector3(0.0, -PANEL_THICKNESS * 0.5, center_z),
 		0.0,
@@ -205,9 +214,9 @@ func _make_fallback_chunk(cfg: Dictionary) -> Node3D:
 	))
 
 	# Side wall geometry: position the panel center so its inner edge
-	# meets the floor edge at (±FLOOR_WIDTH/2, 0).
+	# meets the floor edge at (±_active_floor_width/2, 0).
 	# Account for panel thickness so the inner top edge is flush with the floor at y=0
-	var wall_cx: float = FLOOR_WIDTH * 0.5 + WALL_WIDTH * 0.5 * cos(WALL_ANGLE) + PANEL_THICKNESS * 0.5 * sin(WALL_ANGLE)
+	var wall_cx: float = _active_floor_width * 0.5 + WALL_WIDTH * 0.5 * cos(WALL_ANGLE) + PANEL_THICKNESS * 0.5 * sin(WALL_ANGLE)
 	var wall_cy: float = WALL_WIDTH * 0.5 * sin(WALL_ANGLE) - PANEL_THICKNESS * 0.5 * cos(WALL_ANGLE)
 	var wall_size := Vector3(WALL_WIDTH, PANEL_THICKNESS, CHUNK_LENGTH)
 
@@ -238,28 +247,28 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
 		if roll < cfg.tree:
-			var max_offset := FLOOR_WIDTH * 0.5 - TREE_FOLIAGE_RADIUS - 0.5
+			var max_offset := _active_floor_width * 0.5 - TREE_FOLIAGE_RADIUS - 0.5
 			var tx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_tree_cluster(Vector3(tx, 0.0, z)))
 		elif roll < cfg.tree + cfg.rail:
 			var length := randf_range(RAIL_LENGTH_MIN, RAIL_LENGTH_MAX)
-			var max_offset := FLOOR_WIDTH * 0.5 - RAIL_WIDTH_COLLISION * 0.5
+			var max_offset := _active_floor_width * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
 		elif roll < cfg.tree + cfg.rail + cfg.mogul:
 			root.add_child(_make_mogul_field(Vector3(0.0, 0.0, z)))
 		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp:
-			var max_offset := FLOOR_WIDTH * 0.5 - RAMP_WIDTH * 0.5
+			var max_offset := _active_floor_width * 0.5 - RAMP_WIDTH * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
 			var ramp_length := randf_range(RAMP_LENGTH_MIN, RAMP_LENGTH_MAX)
 			root.add_child(_make_ramp(Vector3(rx, 0.0, z), ramp_angle, ramp_length))
 		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush:
-			var max_offset := FLOOR_WIDTH * 0.5 - BUSH_RADIUS - 0.5
+			var max_offset := _active_floor_width * 0.5 - BUSH_RADIUS - 0.5
 			var bx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_bush_cluster(Vector3(bx, 0.0, z)))
 		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock:
-			var max_offset := FLOOR_WIDTH * 0.5 - ROCK_RADIUS_MAX - 0.5
+			var max_offset := _active_floor_width * 0.5 - ROCK_RADIUS_MAX - 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rock_cluster(Vector3(rx, 0.0, z)))
 		z -= RAMP_SLOT_SPACING
@@ -441,7 +450,7 @@ func _make_mogul_field(center: Vector3) -> Node3D:
 	field.position = center
 	field.name = "MogulField"
 	var count := randi_range(MOGULS_PER_FIELD_MIN, MOGULS_PER_FIELD_MAX)
-	var max_x := FLOOR_WIDTH * 0.5 - MOGUL_BASE
+	var max_x := _active_floor_width * 0.5 - MOGUL_BASE
 	for i in range(count):
 		var ox := randf_range(-max_x, max_x)
 		var oz := randf_range(-MOGUL_FIELD_SPREAD_Z * 0.5, MOGUL_FIELD_SPREAD_Z * 0.5)
@@ -744,7 +753,7 @@ func _make_rock_crystal(pos: Vector3) -> Node3D:
 func _make_lap_marker() -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(FLOOR_WIDTH, 0.02, 0.18)
+	box.size = Vector3(_active_floor_width, 0.02, 0.18)
 	mi.mesh = box
 	mi.position = Vector3(0.0, 0.02, -(CHUNK_LENGTH - 0.09))
 	var mat := StandardMaterial3D.new()
@@ -799,8 +808,8 @@ func _pick_variant() -> void:
 func _make_display_name(base: String) -> String:
 	# Inserts the variant prefix after "THE " — e.g. "THE MISTY PARK", "THE STEEP RUNS"
 	match _active_variant:
-		VARIANT_MISTY:  return "THE MISTY " + base.substr(4)
-		VARIANT_STEEP:  return "THE STEEP " + base.substr(4)
+		VARIANT_MISTY:    return "THE MISTY " + base.substr(4)
+		VARIANT_STEEP:    return "THE STEEP " + base.substr(4)
 		VARIANT_CLEAR:  return "THE CLEAR " + base.substr(4)
 		_: return base
 
