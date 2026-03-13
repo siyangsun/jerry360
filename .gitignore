@@ -4,6 +4,9 @@
 # Android export
 /android/
 
+# Export presets (machine-specific)
+export_presets.cfg
+
 # Exported binaries
 *.exe
 *.x86_64
