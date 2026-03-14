@@ -21,6 +21,7 @@ const JERRY_COLORS: Array[Color] = [
 const BOARD_COLORS: Array[Color] = [
 	Color(0.18, 0.18, 0.18),  # slate (default)
 	Color(0.95, 0.82, 0.08),  # marigold
+	Color(0.04, 0.42, 1.0),   # electric blue (tutorial unlock)
 ]
 
 const CONTROLS_DATA: Array[Dictionary] = [
@@ -62,6 +63,7 @@ var _wow_timer: float = 0.0
 var _wife_call_active: bool = false
 var _jerry_swatch_styles: Array[StyleBoxFlat] = []
 var _board_swatch_styles: Array[StyleBoxFlat] = []
+var _board_hbox: HBoxContainer
 var _preview_body: ColorRect
 var _preview_board: ColorRect
 var _selected_jerry: int = 0
@@ -280,6 +282,7 @@ func _ready() -> void:
 	_death_overlay.color = SCREEN_OVERLAY_COLOR
 	_build_controls_screen()
 	_build_customize_screen()
+	AppearanceManager.unlock_changed.connect(_on_tutorial_board_unlocked)
 	call_deferred("_connect_level_generator")
 	_on_state_changed(GameManager.state)
 
@@ -552,21 +555,22 @@ func _build_customize_screen() -> void:
 	board_label.add_theme_font_size_override("font_size", 18)
 	_customize_screen.add_child(board_label)
 
-	var board_hbox := HBoxContainer.new()
-	board_hbox.anchor_left = 0.04
-	board_hbox.anchor_right = 0.56
-	board_hbox.anchor_top = 0.61
-	board_hbox.anchor_bottom = 0.76
-	board_hbox.add_theme_constant_override("separation", 10)
-	_customize_screen.add_child(board_hbox)
+	_board_hbox = HBoxContainer.new()
+	_board_hbox.anchor_left = 0.04
+	_board_hbox.anchor_right = 0.56
+	_board_hbox.anchor_top = 0.61
+	_board_hbox.anchor_bottom = 0.76
+	_board_hbox.add_theme_constant_override("separation", 10)
+	_customize_screen.add_child(_board_hbox)
 
 	_board_swatch_styles.clear()
-	for i in BOARD_COLORS.size():
+	var board_count := BOARD_COLORS.size() if AppearanceManager.tutorial_board_unlocked else BOARD_COLORS.size() - 1
+	for i in board_count:
 		var btn := _make_swatch_button(BOARD_COLORS[i], i == _selected_board)
 		var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
 		_board_swatch_styles.append(style)
 		btn.pressed.connect(_on_board_color_selected.bind(i))
-		board_hbox.add_child(btn)
+		_board_hbox.add_child(btn)
 
 	# Preview panel
 	var preview_panel := Panel.new()
@@ -805,4 +809,16 @@ func _on_afternoon_started() -> void:
 
 func _on_tutorial_complete() -> void:
 	_tutorial_label.visible = false
+	AppearanceManager.unlock_tutorial_board()
 	GameManager.return_to_menu()
+
+
+func _on_tutorial_board_unlocked() -> void:
+	if not is_instance_valid(_board_hbox):
+		return
+	var i := BOARD_COLORS.size() - 1
+	var btn := _make_swatch_button(BOARD_COLORS[i], i == _selected_board)
+	var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
+	_board_swatch_styles.append(style)
+	btn.pressed.connect(_on_board_color_selected.bind(i))
+	_board_hbox.add_child(btn)
