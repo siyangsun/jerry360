@@ -36,6 +36,8 @@ const CONTROLS_DATA: Array[Dictionary] = [
 ]
 
 const LAP_DISTANCE := 1000.0
+const WIFE_CALL_TEXT := WIFE_CALL_TEXT
+const WIFE_KILL_TEXT := WIFE_KILL_TEXT
 
 var _elapsed: float = 0.0
 var _lap_time: float = 0.0
@@ -176,7 +178,7 @@ func _ready() -> void:
 	serif_font.font_names = PackedStringArray(["Georgia", "Times New Roman", "Times", "serif"])
 
 	_wife_label = Label.new()
-	_wife_label.text = "Hi honey, are you having fun?"
+	_wife_label.text = WIFE_CALL_TEXT
 	_wife_label.add_theme_font_size_override("font_size", 20)
 	_wife_label.add_theme_font_override("font", serif_font)
 	_wife_label.add_theme_color_override("font_color", Color.BLACK)
@@ -732,6 +734,7 @@ func _on_game_started() -> void:
 	_wife_call_timer = 0.0
 	_wife_kill_timer = 0.0
 	_woohoo_timer = 0.0
+	_wife_label.text = WIFE_CALL_TEXT
 
 
 func _on_try_again_pressed() -> void:
@@ -780,7 +783,7 @@ func _resolve_wife_call() -> void:
 		_woohoo_label.visible = true
 		_woohoo_timer = woohoo_display_time
 	else:
-		_wife_label.text = "No? Aww, I'm sorry. Come home whenever you get the chance!"
+		_wife_label.text = WIFE_KILL_TEXT
 		_wife_kill_timer = wife_kill_delay
 
 
