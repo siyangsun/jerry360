@@ -249,6 +249,7 @@ func _ready() -> void:
 	add_child(_trick_label)
 
 	_tutorial_label = Label.new()
+	_tutorial_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
 	_tutorial_label.add_theme_font_size_override("font_size", 16)
 	_tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tutorial_label.anchor_left = 0.1
