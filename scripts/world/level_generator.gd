@@ -5,6 +5,8 @@ extends Node3D
 
 signal level_changed(level_name: String, level_index: int)
 signal variant_changed(variant: String)
+signal tutorial_stage_changed(stage_index: int)
+signal tutorial_complete
 
 const CHUNK_LENGTH := 80.0      # length of each generated section of mountain (meters)
 const CHUNKS_AHEAD := 10        # how many sections are built in front of Jerry at all times
@@ -96,6 +98,40 @@ const RAIL_RAMP_GAP := 0.1         # small gap between the ramp top and the flat
 # Weights are evaluated in order (tree → rail → mogul → ramp); remaining roll = empty slot.
 const EMPTY_LEVEL := { "tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0 }
 
+# ── Tutorial configs ───────────────────────────────────────────────────────────
+# Five hardcoded stages played in order. Each has a variant key (drives tilt + speed)
+# and a floor_width key (optional, defaults to FLOOR_WIDTH).
+# Instructions for each stage live in res://assets/tutorial/stage_N.txt.
+const TUTORIAL_STAGE_COUNT := 5
+const TUTORIAL_LAP_CHUNKS := LAP_CHUNKS * 3  # each tutorial stage is 3x longer than a regular lap
+const TUTORIAL_LEVELS := [
+	{
+		"name": "BUNNY HILL",
+		"variant": "clear", "floor_width": FLOOR_WIDTH,
+		"tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0,
+	},
+	{
+		"name": "CAT TRACK",
+		"variant": "clear", "floor_width": NARROWS_FLOOR_WIDTH,
+		"tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0,
+	},
+	{
+		"name": "CIRCLE TRAIL",
+		"variant": "clear", "floor_width": FLOOR_WIDTH,
+		"tree": 0.25, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0,
+	},
+	{
+		"name": "BASIC PARK",
+		"variant": "clear", "floor_width": FLOOR_WIDTH,
+		"tree": 0.0, "rail": 0.40, "mogul": 0.0, "ramp": 0.40, "bush": 0.0, "rock": 0.0,
+	},
+	{
+		"name": "ICY BLUE",
+		"variant": "steep", "floor_width": FLOOR_WIDTH,
+		"tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0,
+	},
+]
+
 const LEVELS := [
 	{
 		"name": "THE PARK",
@@ -166,7 +202,19 @@ func _process(_delta: float) -> void:
 	var player_chunk := int(-player.position.z / CHUNK_LENGTH)
 	while player_chunk > _last_player_chunk:
 		_last_player_chunk += 1
-		if _last_player_chunk % LAP_CHUNKS == 0:
+		if GameManager.is_tutorial:
+			if _last_player_chunk % TUTORIAL_LAP_CHUNKS == 0:
+				var stage := _last_player_chunk / TUTORIAL_LAP_CHUNKS
+				if stage >= TUTORIAL_STAGE_COUNT:
+					tutorial_complete.emit()
+				else:
+					var cfg: Dictionary = TUTORIAL_LEVELS[stage]
+					var variant: String = cfg.get("variant", VARIANT_REGULAR)
+					_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+					GameManager.set_variant(variant)
+					tutorial_stage_changed.emit(stage)
+					level_changed.emit(cfg["name"], stage + 1)
+		elif _last_player_chunk % LAP_CHUNKS == 0:
 			_display_level_index = (_display_level_index + 1) % LEVELS.size()
 			_display_level_number += 1
 			_pick_variant()
@@ -184,8 +232,15 @@ func _spawn_chunk() -> void:
 
 	# Derive level from chunk position — same formula as the display side
 	var chunk_idx := int(-_spawn_z / CHUNK_LENGTH)
-	var level_idx := (chunk_idx / LAP_CHUNKS) % LEVELS.size()
-	var cfg: Dictionary = LEVELS[level_idx]
+	var cfg: Dictionary
+	if GameManager.is_tutorial:
+		var stage_idx := mini(chunk_idx / TUTORIAL_LAP_CHUNKS, TUTORIAL_STAGE_COUNT - 1)
+		cfg = TUTORIAL_LEVELS[stage_idx]
+		var variant: String = cfg.get("variant", VARIANT_REGULAR)
+		_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+	else:
+		var level_idx := (chunk_idx / LAP_CHUNKS) % LEVELS.size()
+		cfg = LEVELS[level_idx]
 
 	var chunk: Node3D
 	if chunk_scenes.is_empty():
@@ -238,7 +293,8 @@ func _make_fallback_chunk(cfg: Dictionary) -> Node3D:
 	))
 
 	_maybe_add_obstacles(root, cfg)
-	if _chunk_count % LAP_CHUNKS == 0:
+	var _lap_chunk_size := TUTORIAL_LAP_CHUNKS if GameManager.is_tutorial else LAP_CHUNKS
+	if _chunk_count % _lap_chunk_size == 0:
 		root.add_child(_make_lap_marker())
 	return root
 
@@ -828,7 +884,17 @@ func _reset() -> void:
 	_display_level_index = 0
 	_display_level_number = 1
 	_last_player_chunk = 0
-	_pick_variant()
-	for i in range(CHUNKS_AHEAD + 1):
-		_spawn_chunk()
-	level_changed.emit(_make_display_name(LEVELS[0]["name"]), 1)
+	if GameManager.is_tutorial:
+		var cfg: Dictionary = TUTORIAL_LEVELS[0]
+		var variant: String = cfg.get("variant", VARIANT_REGULAR)
+		_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+		GameManager.set_variant(variant)
+		for i in range(CHUNKS_AHEAD + 1):
+			_spawn_chunk()
+		level_changed.emit(TUTORIAL_LEVELS[0]["name"], 1)
+		tutorial_stage_changed.emit(0)
+	else:
+		_pick_variant()
+		for i in range(CHUNKS_AHEAD + 1):
+			_spawn_chunk()
+		level_changed.emit(_make_display_name(LEVELS[0]["name"]), 1)

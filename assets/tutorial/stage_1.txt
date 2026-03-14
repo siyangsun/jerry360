@@ -1,0 +1,5 @@
+A and D lean you left and right, allowing you to turn slightly
+a full turn requires also rotating the board — done with the arrow keys
+in conjunction, this lets you carve through the snow
+be careful rotating your board without leaning; you'll lose your balance
+try to stay centered before the next course

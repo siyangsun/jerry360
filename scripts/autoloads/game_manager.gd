@@ -24,6 +24,7 @@ var active_speed_ramp_rate: float = SPEED_RAMP_RATE
 @export var wife_call_threshold_ramp: float = 2000.0
 
 var wife_killed_jerry: bool = false
+var is_tutorial: bool = false
 
 var _play_elapsed: float = 0.0
 var _call_minute: int = 0
@@ -39,7 +40,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
-func start_game() -> void:
+func start_game(tutorial: bool = false) -> void:
+	is_tutorial = tutorial
 	current_speed = BASE_SPEED
 	ramp_multiplier = 1.0
 	active_max_speed = MAX_SPEED
@@ -78,6 +80,7 @@ func player_died() -> void:
 
 
 func return_to_menu() -> void:
+	is_tutorial = false
 	get_tree().paused = false
 	_set_state(State.MENU)
 
@@ -97,7 +100,7 @@ func _process(delta: float) -> void:
 		current_speed = minf(current_speed + active_speed_ramp_rate * ramp_multiplier * delta, active_max_speed)
 		speed_changed.emit(current_speed)
 	_play_elapsed += delta
-	if not _wife_call_pending and _play_elapsed >= wife_call_interval * (_call_minute + 1):
+	if not is_tutorial and not _wife_call_pending and _play_elapsed >= wife_call_interval * (_call_minute + 1):
 		_wife_call_pending = true
 		wife_calling.emit()
 

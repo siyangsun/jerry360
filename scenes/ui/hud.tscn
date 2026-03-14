@@ -54,26 +54,69 @@ theme_override_colors/font_shadow_color = Color(0.35, 0.2, 0.0, 1)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
 
-[node name="StartButton" type="Button" parent="MenuScreen"]
+[node name="PunchPassButton" type="Button" parent="MenuScreen"]
 anchor_left = 0.38
 anchor_top = 0.68
 anchor_right = 0.62
 anchor_bottom = 0.75
-text = "Start Shredding?"
+text = "Punch Your Pass"
 
 [node name="HowToPlayButton" type="Button" parent="MenuScreen"]
 anchor_left = 0.38
-anchor_top = 0.77
+anchor_top = 0.76
 anchor_right = 0.62
-anchor_bottom = 0.84
+anchor_bottom = 0.83
 text = "How to Play"
 
 [node name="CustomizeButton" type="Button" parent="MenuScreen"]
 anchor_left = 0.38
-anchor_top = 0.86
+anchor_top = 0.84
 anchor_right = 0.62
-anchor_bottom = 0.93
+anchor_bottom = 0.91
 text = "Stop by Lodge"
+
+[node name="GameModeScreen" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+
+[node name="PoisonLabel" type="Label" parent="GameModeScreen"]
+anchor_left = 0.0
+anchor_top = 0.38
+anchor_right = 1.0
+anchor_bottom = 0.58
+text = "pick your poison"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 48
+theme_override_fonts/font = SubResource("Font_bold")
+theme_override_colors/font_color = Color(1.0, 0.82, 0.1, 1)
+theme_override_colors/font_outline_color = Color(1.0, 0.97, 0.55, 1)
+theme_override_constants/outline_size = 2
+theme_override_colors/font_shadow_color = Color(0.35, 0.2, 0.0, 1)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+
+[node name="StartButton" type="Button" parent="GameModeScreen"]
+anchor_left = 0.38
+anchor_top = 0.60
+anchor_right = 0.62
+anchor_bottom = 0.67
+text = "Start Shredding?"
+
+[node name="LearnButton" type="Button" parent="GameModeScreen"]
+anchor_left = 0.38
+anchor_top = 0.69
+anchor_right = 0.62
+anchor_bottom = 0.76
+text = "Learn the Slopes"
+
+[node name="BackButton" type="Button" parent="GameModeScreen"]
+anchor_left = 0.38
+anchor_top = 0.87
+anchor_right = 0.62
+anchor_bottom = 0.94
+text = "< Back"
 
 [node name="DeathScreen" type="Control" parent="."]
 anchor_right = 1.0
@@ -172,8 +215,11 @@ anchor_bottom = 0.73
 text = "Quit to Menu"
 
 [connection signal="pressed" from="MenuScreen/CustomizeButton" to="." method="_on_customize_pressed"]
-[connection signal="pressed" from="MenuScreen/StartButton" to="." method="_on_start_pressed"]
+[connection signal="pressed" from="MenuScreen/PunchPassButton" to="." method="_on_punch_pass_pressed"]
 [connection signal="pressed" from="MenuScreen/HowToPlayButton" to="." method="_on_how_to_play_pressed"]
+[connection signal="pressed" from="GameModeScreen/StartButton" to="." method="_on_start_pressed"]
+[connection signal="pressed" from="GameModeScreen/LearnButton" to="." method="_on_learn_pressed"]
+[connection signal="pressed" from="GameModeScreen/BackButton" to="." method="_on_game_mode_back_pressed"]
 [connection signal="pressed" from="DeathScreen/TryAgainButton" to="." method="_on_try_again_pressed"]
 [connection signal="pressed" from="PauseScreen/ResumeButton" to="." method="_on_resume_pressed"]
 [connection signal="pressed" from="PauseScreen/MenuButton" to="." method="_on_menu_pressed"]
