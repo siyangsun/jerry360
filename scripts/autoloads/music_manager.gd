@@ -6,6 +6,8 @@ var _menu_player: AudioStreamPlayer
 var _game_player: AudioStreamPlayer
 var _death_player: AudioStreamPlayer
 
+const TUTORIAL_SONG := "res://assets/audio/music/figuring it out.mp3"
+
 const GAMEPLAY_SONGS: Array[String] = [
 	"res://assets/audio/music/KRAZYKRAZY.mp3",
 	"res://assets/audio/music/osmanthus danger.mp3",
@@ -66,11 +68,22 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 			_switch_to(_death_player, [_menu_player, _game_player])
 		GameManager.State.PLAYING:
 			if not _game_player.playing:
-				_play_random_gameplay_song()
+				if GameManager.is_tutorial:
+					_play_tutorial_song()
+				else:
+					_play_random_gameplay_song()
 			_menu_player.stop()
 			_death_player.stop()
 		GameManager.State.PAUSED:
 			pass  # keep whatever is playing
+
+
+func _play_tutorial_song() -> void:
+	var stream := load(TUTORIAL_SONG) as AudioStreamMP3
+	stream.loop = true
+	_game_player.stream = stream
+	_game_player.play()
+	song_changed.emit(TUTORIAL_SONG.get_file().get_basename())
 
 
 func skip_song() -> void:
