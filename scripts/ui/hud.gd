@@ -36,8 +36,8 @@ const CONTROLS_DATA: Array[Dictionary] = [
 ]
 
 const LAP_DISTANCE := 1000.0
-const WIFE_CALL_TEXT := WIFE_CALL_TEXT
-const WIFE_KILL_TEXT := WIFE_KILL_TEXT
+const WIFE_CALL_TEXT := "Hi honey, are you having fun?"
+const WIFE_KILL_TEXT := "No? Aww, I'm sorry. Come home whenever you get the chance!"
 
 var _elapsed: float = 0.0
 var _lap_time: float = 0.0
