@@ -111,6 +111,9 @@ var _is_squatting: bool = false
 var _turn_burst_frames: int = 0
 var _turn_burst_dir: float = 0.0
 
+var _jerry_material: StandardMaterial3D
+var _board_material: StandardMaterial3D
+
 var _board_yaw: float = 0.0    # board facing angle offset from world forward (rad, + = right)
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
@@ -143,6 +146,21 @@ func _ready() -> void:
 	_squat_root.scale = Vector3.ONE
 	_capsule = _collision_shape.shape as CapsuleShape3D
 	assert(_capsule != null, "Player CollisionShape3D must use a CapsuleShape3D — check main.tscn")
+
+	_jerry_material = StandardMaterial3D.new()
+	_jerry_material.metallic = 0.9
+	_jerry_material.metallic_specular = 1.0
+	_jerry_material.roughness = 0.05
+	var boarder_mesh := $SquatRoot/MeshPivot/BoarderMesh as MeshInstance3D
+	if is_instance_valid(boarder_mesh):
+		boarder_mesh.set_surface_override_material(0, _jerry_material)
+
+	_board_material = StandardMaterial3D.new()
+	_board_material.roughness = 1.0
+	snowboard_mesh.set_surface_override_material(0, _board_material)
+
+	AppearanceManager.appearance_changed.connect(_apply_appearance)
+	_apply_appearance()
 
 
 func _physics_process(delta: float) -> void:
@@ -734,7 +752,13 @@ func _make_snow_particles() -> GPUParticles3D:
 	return p
 
 
+func _apply_appearance() -> void:
+	_jerry_material.albedo_color = AppearanceManager.jerry_color
+	_board_material.albedo_color = AppearanceManager.board_color
+
+
 func _on_game_started() -> void:
+	_apply_appearance()
 	_is_dead = false
 	is_goofy = false
 	stance_changed.emit(false)

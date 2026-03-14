@@ -5,10 +5,22 @@ extends CanvasLayer
 @onready var death_label: Label = $DeathScreen/DeathLabel
 @onready var _death_overlay: ColorRect = $DeathScreen/GrayOverlay
 @onready var menu_screen: Control = $MenuScreen
+@onready var _customize_screen: Control = $CustomizeScreen
 @onready var _controls_screen: Control = $ControlsScreen
 @onready var _pause_screen: Control = $PauseScreen
 
 const SCREEN_OVERLAY_COLOR := Color(0.15, 0.15, 0.15, 0.3)
+
+const JERRY_COLORS: Array[Color] = [
+	Color(1.0, 0.45, 0.05),   # burnt orange (default)
+	Color(0.12, 0.22, 0.75),  # navy
+	Color(0.85, 0.08, 0.12),  # cherry
+	Color(0.08, 0.55, 0.18),  # pine
+]
+const BOARD_COLORS: Array[Color] = [
+	Color(0.18, 0.18, 0.18),  # slate (default)
+	Color(0.95, 0.82, 0.08),  # marigold
+]
 
 const CONTROLS_DATA: Array[Dictionary] = [
 	{"key": "← →",        "desc": "Steer the board left and right"},
@@ -45,6 +57,12 @@ var _wife_audio: AudioStreamPlayer
 var _wow_label: Label
 var _wow_timer: float = 0.0
 var _wife_call_active: bool = false
+var _jerry_swatch_styles: Array[StyleBoxFlat] = []
+var _board_swatch_styles: Array[StyleBoxFlat] = []
+var _preview_body: ColorRect
+var _preview_board: ColorRect
+var _selected_jerry: int = 0
+var _selected_board: int = 0
 var _wife_call_timer: float = 0.0
 var _wife_kill_timer: float = 0.0
 var _woohoo_timer: float = 0.0
@@ -207,6 +225,7 @@ func _ready() -> void:
 		_player.nice_air.connect(_on_nice_air)
 	_death_overlay.color = SCREEN_OVERLAY_COLOR
 	_build_controls_screen()
+	_build_customize_screen()
 	call_deferred("_connect_level_generator")
 	_on_state_changed(GameManager.state)
 
@@ -345,6 +364,7 @@ func _on_combo_changed(count: int, multiplier: float) -> void:
 
 func _on_state_changed(new_state: GameManager.State) -> void:
 	menu_screen.visible = new_state == GameManager.State.MENU
+	_customize_screen.visible = false
 	_controls_screen.visible = false
 	_pause_screen.visible = new_state == GameManager.State.PAUSED
 	death_screen.visible = new_state == GameManager.State.DEAD
@@ -398,6 +418,192 @@ func _on_wipeout_danger(intensity: float, reason: int) -> void:
 		3: _danger_label.text = "LEVEL OUT"   # AIR_TILT
 	_danger_label.add_theme_color_override("font_color", Color(1.0, 1.0 - intensity, 0.0))
 	_danger_vignette.color = Color(1.0, 0.0, 0.0, intensity * 0.18)
+
+
+func _build_customize_screen() -> void:
+	var overlay := ColorRect.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.color = SCREEN_OVERLAY_COLOR
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_customize_screen.add_child(overlay)
+
+	var title := Label.new()
+	title.text = "CUSTOMIZE JERRY"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title.anchor_left = 0.04
+	title.anchor_right = 0.56
+	title.anchor_top = 0.04
+	title.anchor_bottom = 0.16
+	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1, 1))
+	_customize_screen.add_child(title)
+
+	var jerry_label := Label.new()
+	jerry_label.text = "his jacket:"
+	jerry_label.anchor_left = 0.04
+	jerry_label.anchor_right = 0.56
+	jerry_label.anchor_top = 0.20
+	jerry_label.anchor_bottom = 0.30
+	jerry_label.add_theme_font_size_override("font_size", 18)
+	_customize_screen.add_child(jerry_label)
+
+	var jerry_hbox := HBoxContainer.new()
+	jerry_hbox.anchor_left = 0.04
+	jerry_hbox.anchor_right = 0.56
+	jerry_hbox.anchor_top = 0.31
+	jerry_hbox.anchor_bottom = 0.46
+	jerry_hbox.add_theme_constant_override("separation", 10)
+	_customize_screen.add_child(jerry_hbox)
+
+	_jerry_swatch_styles.clear()
+	for i in JERRY_COLORS.size():
+		var btn := _make_swatch_button(JERRY_COLORS[i], i == _selected_jerry)
+		var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
+		_jerry_swatch_styles.append(style)
+		btn.pressed.connect(_on_jerry_color_selected.bind(i))
+		jerry_hbox.add_child(btn)
+
+	var board_label := Label.new()
+	board_label.text = "his board:"
+	board_label.anchor_left = 0.04
+	board_label.anchor_right = 0.56
+	board_label.anchor_top = 0.50
+	board_label.anchor_bottom = 0.60
+	board_label.add_theme_font_size_override("font_size", 18)
+	_customize_screen.add_child(board_label)
+
+	var board_hbox := HBoxContainer.new()
+	board_hbox.anchor_left = 0.04
+	board_hbox.anchor_right = 0.56
+	board_hbox.anchor_top = 0.61
+	board_hbox.anchor_bottom = 0.76
+	board_hbox.add_theme_constant_override("separation", 10)
+	_customize_screen.add_child(board_hbox)
+
+	_board_swatch_styles.clear()
+	for i in BOARD_COLORS.size():
+		var btn := _make_swatch_button(BOARD_COLORS[i], i == _selected_board)
+		var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
+		_board_swatch_styles.append(style)
+		btn.pressed.connect(_on_board_color_selected.bind(i))
+		board_hbox.add_child(btn)
+
+	# Preview panel
+	var preview_panel := Panel.new()
+	preview_panel.anchor_left = 0.62
+	preview_panel.anchor_right = 0.96
+	preview_panel.anchor_top = 0.10
+	preview_panel.anchor_bottom = 0.86
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.06, 0.06, 0.10)
+	panel_style.set_corner_radius_all(4)
+	preview_panel.add_theme_stylebox_override("panel", panel_style)
+	_customize_screen.add_child(preview_panel)
+
+	var preview_label := Label.new()
+	preview_label.text = "preview"
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.anchor_left = 0.0
+	preview_label.anchor_right = 1.0
+	preview_label.anchor_top = 0.04
+	preview_label.anchor_bottom = 0.14
+	preview_label.add_theme_font_size_override("font_size", 13)
+	preview_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.4))
+	preview_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.add_child(preview_label)
+
+	_preview_body = ColorRect.new()
+	_preview_body.color = JERRY_COLORS[_selected_jerry]
+	_preview_body.anchor_left = 0.5
+	_preview_body.anchor_right = 0.5
+	_preview_body.anchor_top = 0.5
+	_preview_body.anchor_bottom = 0.5
+	_preview_body.offset_left = -28.0
+	_preview_body.offset_right = 28.0
+	_preview_body.offset_top = -75.0
+	_preview_body.offset_bottom = 35.0
+	_preview_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.add_child(_preview_body)
+
+	_preview_board = ColorRect.new()
+	_preview_board.color = BOARD_COLORS[_selected_board]
+	_preview_board.anchor_left = 0.5
+	_preview_board.anchor_right = 0.5
+	_preview_board.anchor_top = 0.5
+	_preview_board.anchor_bottom = 0.5
+	_preview_board.offset_left = -52.0
+	_preview_board.offset_right = 52.0
+	_preview_board.offset_top = 42.0
+	_preview_board.offset_bottom = 55.0
+	_preview_board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.add_child(_preview_board)
+
+	var back_btn := Button.new()
+	back_btn.text = "< Back"
+	back_btn.anchor_left = 0.04
+	back_btn.anchor_right = 0.22
+	back_btn.anchor_top = 0.88
+	back_btn.anchor_bottom = 0.96
+	back_btn.pressed.connect(_on_customize_back_pressed)
+	_customize_screen.add_child(back_btn)
+
+
+func _make_swatch_button(color: Color, selected: bool) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(52, 52)
+	btn.text = ""
+
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = color
+	normal.set_corner_radius_all(3)
+	normal.set_border_width_all(3 if selected else 0)
+	normal.border_color = Color.WHITE
+
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = color.lightened(0.15)
+	hover.set_corner_radius_all(3)
+	hover.set_border_width_all(2)
+	hover.border_color = Color(1, 1, 1, 0.7)
+
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = color
+	focus.set_corner_radius_all(3)
+
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", normal)
+	btn.add_theme_stylebox_override("focus", focus)
+	return btn
+
+
+func _on_jerry_color_selected(idx: int) -> void:
+	_selected_jerry = idx
+	AppearanceManager.jerry_color = JERRY_COLORS[idx]
+	AppearanceManager.appearance_changed.emit()
+	for i in _jerry_swatch_styles.size():
+		_jerry_swatch_styles[i].set_border_width_all(3 if i == idx else 0)
+	if is_instance_valid(_preview_body):
+		_preview_body.color = JERRY_COLORS[idx]
+
+
+func _on_board_color_selected(idx: int) -> void:
+	_selected_board = idx
+	AppearanceManager.board_color = BOARD_COLORS[idx]
+	AppearanceManager.appearance_changed.emit()
+	for i in _board_swatch_styles.size():
+		_board_swatch_styles[i].set_border_width_all(3 if i == idx else 0)
+	if is_instance_valid(_preview_board):
+		_preview_board.color = BOARD_COLORS[idx]
+
+
+func _on_customize_pressed() -> void:
+	menu_screen.visible = false
+	_customize_screen.visible = true
+
+
+func _on_customize_back_pressed() -> void:
+	_customize_screen.visible = false
+	menu_screen.visible = true
 
 
 func _on_how_to_play_pressed() -> void:

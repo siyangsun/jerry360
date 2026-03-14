@@ -22,6 +22,7 @@ GameManager="*res://scripts/autoloads/game_manager.gd"
 ScoreManager="*res://scripts/autoloads/score_manager.gd"
 MusicManager="*res://scripts/autoloads/music_manager.gd"
 SfxManager="*res://scripts/autoloads/sfx_manager.gd"
+AppearanceManager="*res://scripts/autoloads/appearance_manager.gd"
 
 [display]
 
