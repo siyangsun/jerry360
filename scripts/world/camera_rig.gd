@@ -21,8 +21,8 @@ const ACCEL_DROP_RATE       := 0.07  # how much the camera dips on a burst of ac
 const ACCEL_DROP_MAX        := 0.7   # maximum dip amount — keeps it from going crazy
 const ACCEL_DROP_SMOOTH     := 4.0   # how fast the camera recovers from the dip
 
-const SPEED_FOV_BASE  := 68.0  # normal field of view at slow speed (higher = wider angle)
-const SPEED_FOV_BOOST := 12.0  # extra field of view added at top speed (makes it feel faster)
+const SPEED_FOV_BASE  := 60.0  # normal field of view at slow speed (higher = wider angle)
+const SPEED_FOV_BOOST := 20.0  # extra field of view added at top speed (makes it feel faster)
 const AIR_CAM_LIFT    := 1.4   # camera rises when Jerry is in the air so you can see the landing
 const SLOPE_LOOK_Y_MULT := 0.1  # how much the look target drops per degree of slope (pushes horizon up)
 
