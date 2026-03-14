@@ -60,6 +60,16 @@ const ROCK_TILT_Z_MAX := 0.35                  # max random side tilt (radians)
 const ROCK_CLUSTER_SPREAD := 3.5              # how spread out crystals are within a clump
 const ROCK_COLOR := Color(0.16, 0.17, 0.20)    # cool dark gray with slight blue cast
 
+# Poles (Lift Area only) — T-shaped lift poles: vertical shaft + horizontal crossbar
+const POLE_SHAFT_WIDTH  := 0.18    # width and depth of the vertical shaft
+const POLE_SHAFT_HEIGHT := 5.5     # total height of the shaft
+const POLE_BAR_LENGTH   := 2.4     # length of the horizontal crossbar
+const POLE_BAR_HEIGHT   := 0.18    # thickness of the crossbar
+const POLE_BAR_DEPTH    := 0.22    # depth of the crossbar
+const POLE_SINK         := 0.1     # how far the base sits below ground level
+const POLE_PAIR_SPREAD  := 5.0     # X distance between the two poles in a pair
+const POLE_COLOR        := Color(0.16, 0.17, 0.20)  # same cool dark gray as rocks
+
 # Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
 const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
 
@@ -159,6 +169,11 @@ const LEVELS := [
 		"floor_width": NARROWS_FLOOR_WIDTH,
 		"tree": 0.12, "rail": 0.30, "mogul": 0.20, "ramp": 0.15, "bush": 0.00, "rock": 0.18,
 	},
+	{
+		"name": "THE LIFT AREA",
+		"chunks": 5,
+		"tree": 0.05, "rail": 0.00, "mogul": 0.40, "ramp": 0.12, "bush": 0.00, "rock": 0.00, "pole": 0.45,
+	},
 ]
 
 @export var chunk_scenes: Array[PackedScene] = []
@@ -177,6 +192,8 @@ var _last_player_chunk: int = 0
 var _active_variant: String = VARIANT_REGULAR
 var _active_tilt_angle: float = DOWNHILL_TILT_ANGLE
 var _active_floor_width: float = FLOOR_WIDTH
+
+var _seen_lift_area: bool = false  # true once the player has entered the Lift Area
 
 
 func _ready() -> void:
@@ -218,7 +235,12 @@ func _process(_delta: float) -> void:
 			_display_level_index = (_display_level_index + 1) % LEVELS.size()
 			_display_level_number += 1
 			_pick_variant()
-			level_changed.emit(_make_display_name(LEVELS[_display_level_index]["name"]), _display_level_number)
+			var display_name := _make_display_name(LEVELS[_display_level_index]["name"])
+			level_changed.emit(display_name, _display_level_number)
+			if _seen_lift_area and not GameManager.is_afternoon:
+				GameManager.set_afternoon()
+			if "LIFT AREA" in display_name:
+				_seen_lift_area = true
 
 	var despawn_z := player.position.z + CHUNKS_BEHIND * CHUNK_LENGTH
 	for chunk in _active_chunks.duplicate():
@@ -328,6 +350,8 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 			var max_offset := _active_floor_width * 0.5 - ROCK_RADIUS_MAX - 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rock_cluster(Vector3(rx, 0.0, z)))
+		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0):
+			root.add_child(_make_pole_pair(Vector3(0.0, 0.0, z)))
 		z -= RAMP_SLOT_SPACING
 
 
@@ -635,6 +659,7 @@ func _make_tree(pos: Vector3) -> Node3D:
 	area_col.shape = area_shape
 	area_col.position.y = (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5
 	area.add_child(area_col)
+	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
 	area.body_entered.connect(func(body: Node3D) -> void:
 		if body.has_method("crash"):
 			body.crash()
@@ -674,6 +699,7 @@ func _make_bush(pos: Vector3) -> Node3D:
 	area_col.shape = area_shape
 	area_col.position.y = BUSH_HEIGHT * 0.5
 	area.add_child(area_col)
+	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
 	area.body_entered.connect(func(body: Node3D) -> void:
 		if body.has_method("crash"):
 			body.crash()
@@ -798,6 +824,61 @@ func _make_rock_crystal(pos: Vector3) -> Node3D:
 	area_col.shape = area_shape
 	area_col.position.y = (body_h + cap_h) * 0.5 - ROCK_SINK
 	area.add_child(area_col)
+	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
+	area.body_entered.connect(func(body: Node3D) -> void:
+		if body.has_method("crash"):
+			body.crash()
+	)
+	root.add_child(area)
+
+	return root
+
+
+func _make_pole_pair(center: Vector3) -> Node3D:
+	var cluster := Node3D.new()
+	cluster.position = center
+	cluster.add_child(_make_pole(Vector3(-POLE_PAIR_SPREAD * 0.5, 0.0, 0.0)))
+	cluster.add_child(_make_pole(Vector3( POLE_PAIR_SPREAD * 0.5, 0.0, 0.0)))
+	return cluster
+
+
+func _make_pole(pos: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+	root.rotation_degrees.x = _active_tilt_angle
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = POLE_COLOR
+	mat.roughness = 0.3
+	mat.metallic = 0.6
+
+	# Vertical shaft
+	var shaft_mesh := MeshInstance3D.new()
+	var shaft_box := BoxMesh.new()
+	shaft_box.size = Vector3(POLE_SHAFT_WIDTH, POLE_SHAFT_HEIGHT, POLE_SHAFT_WIDTH)
+	shaft_mesh.mesh = shaft_box
+	shaft_mesh.material_override = mat
+	shaft_mesh.position.y = POLE_SHAFT_HEIGHT * 0.5 - POLE_SINK
+	root.add_child(shaft_mesh)
+
+	# Horizontal crossbar at top
+	var bar_mesh := MeshInstance3D.new()
+	var bar_box := BoxMesh.new()
+	bar_box.size = Vector3(POLE_BAR_LENGTH, POLE_BAR_HEIGHT, POLE_BAR_DEPTH)
+	bar_mesh.mesh = bar_box
+	bar_mesh.material_override = mat
+	bar_mesh.position.y = POLE_SHAFT_HEIGHT - POLE_SINK
+	root.add_child(bar_mesh)
+
+	# Crash area — box covering the lower portion of the shaft where riders pass through
+	var area := Area3D.new()
+	var area_col := CollisionShape3D.new()
+	var area_shape := BoxShape3D.new()
+	area_shape.size = Vector3(0.55, 2.0, 0.55)
+	area_col.shape = area_shape
+	area_col.position.y = 1.0 - POLE_SINK
+	area.add_child(area_col)
+	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
 	area.body_entered.connect(func(body: Node3D) -> void:
 		if body.has_method("crash"):
 			body.crash()
@@ -884,6 +965,7 @@ func _reset() -> void:
 	_display_level_index = 0
 	_display_level_number = 1
 	_last_player_chunk = 0
+	_seen_lift_area = false
 	if GameManager.is_tutorial:
 		var cfg: Dictionary = TUTORIAL_LEVELS[0]
 		var variant: String = cfg.get("variant", VARIANT_REGULAR)

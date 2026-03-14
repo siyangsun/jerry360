@@ -25,6 +25,7 @@ var active_speed_ramp_rate: float = SPEED_RAMP_RATE
 
 var wife_killed_jerry: bool = false
 var is_tutorial: bool = false
+var is_afternoon: bool = false
 
 var _play_elapsed: float = 0.0
 var _call_minute: int = 0
@@ -34,6 +35,7 @@ signal state_changed(new_state: State)
 signal speed_changed(new_speed: float)
 signal wife_calling()
 signal game_started
+signal afternoon_started
 
 
 func _ready() -> void:
@@ -47,11 +49,18 @@ func start_game(tutorial: bool = false) -> void:
 	active_max_speed = MAX_SPEED
 	active_speed_ramp_rate = SPEED_RAMP_RATE
 	wife_killed_jerry = false
+	is_afternoon = false
 	_play_elapsed = 0.0
 	_call_minute = 0
 	_wife_call_pending = false
 	game_started.emit()
 	_set_state(State.PLAYING)
+
+
+func set_afternoon() -> void:
+	if not is_afternoon:
+		is_afternoon = true
+		afternoon_started.emit()
 
 
 func set_variant(variant: String) -> void:

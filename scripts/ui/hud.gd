@@ -73,6 +73,8 @@ var _tutorial_label: Label
 var _tutorial_instructions: Array[String] = []
 var _tutorial_instruction_idx: int = 0
 var _tutorial_instruction_timer: float = 0.0
+var _afternoon_label: Label
+var _afternoon_timer: float = 0.0
 
 @export var fun_rate_wow_threshold: float = 20.0
 @export var wow_display_time: float = 3.0
@@ -80,6 +82,7 @@ var _tutorial_instruction_timer: float = 0.0
 @export var wife_kill_delay: float = 3.0
 @export var woohoo_display_time: float = 2.0
 @export var tutorial_instruction_interval: float = 8.0
+@export var afternoon_display_time: float = 5.0
 
 
 func _ready() -> void:
@@ -210,6 +213,7 @@ func _ready() -> void:
 	GameManager.state_changed.connect(_on_state_changed)
 	GameManager.game_started.connect(_on_game_started)
 	GameManager.wife_calling.connect(_on_wife_calling)
+	GameManager.afternoon_started.connect(_on_afternoon_started)
 	_nice_air_label = Label.new()
 	_nice_air_label.text = "nice air!"
 	_nice_air_label.visible = false
@@ -253,6 +257,19 @@ func _ready() -> void:
 	_tutorial_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tutorial_label.visible = false
 	add_child(_tutorial_label)
+
+	_afternoon_label = Label.new()
+	_afternoon_label.text = "looks like the grommets are off from school"
+	_afternoon_label.add_theme_font_size_override("font_size", 14)
+	_afternoon_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.75))
+	_afternoon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_afternoon_label.anchor_left = 0.1
+	_afternoon_label.anchor_right = 0.9
+	_afternoon_label.anchor_top = 0.88
+	_afternoon_label.anchor_bottom = 0.96
+	_afternoon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_afternoon_label.visible = false
+	add_child(_afternoon_label)
 
 	_player = get_tree().get_first_node_in_group("player")
 	if _player:
@@ -396,6 +413,10 @@ func _process(delta: float) -> void:
 			_woohoo_timer -= delta
 			if _woohoo_timer <= 0.0:
 				_woohoo_label.visible = false
+		if _afternoon_timer > 0.0:
+			_afternoon_timer -= delta
+			if _afternoon_timer <= 0.0:
+				_afternoon_label.visible = false
 		if _tutorial_label.visible and _tutorial_instructions.size() > 1:
 			_tutorial_instruction_timer -= delta
 			if _tutorial_instruction_timer <= 0.0:
@@ -437,20 +458,25 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_wow_timer = 0.0
 		_tutorial_label.visible = false
 		_tutorial_instructions.clear()
+		_afternoon_label.visible = false
+		_afternoon_timer = 0.0
 
 	if new_state == GameManager.State.DEAD:
+		var dist := ScoreManager.distance
+		var best := ScoreManager.high_score
+		var deaths := ScoreManager.deaths
+		var tricks := ScoreManager.tricks_landed
+		var top_combo := ScoreManager.max_combo
+		var trick_str := "%d trick%s" % [tricks, "s" if tricks != 1 else ""]
+		var combo_str := ("best combo x%d" % top_combo) if top_combo > 1 else "no combos"
+		var first_line: String
 		if GameManager.wife_killed_jerry:
-			death_label.text = "should probably get on linkedin"
+			first_line = "wasn't stoked enough i guess.\nshould probably get on linkedin"
+		elif _is_goofy:
+			first_line = "Got a little too goofy."
 		else:
-			var dist := ScoreManager.distance
-			var best := ScoreManager.high_score
-			var deaths := ScoreManager.deaths
-			var tricks := ScoreManager.tricks_landed
-			var top_combo := ScoreManager.max_combo
-			var first_line := "Got a little too goofy." if _is_goofy else "He fell."
-			var trick_str := "%d trick%s" % [tricks, "s" if tricks != 1 else ""]
-			var combo_str := ("best combo x%d" % top_combo) if top_combo > 1 else "no combos"
-			death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n%s  |  %s\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, trick_str, combo_str, best, deaths]
+			first_line = "He fell."
+		death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n%s  |  %s\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, trick_str, combo_str, best, deaths]
 
 
 func _on_stance_changed(goofy: bool) -> void:
@@ -745,7 +771,7 @@ func _resolve_wife_call() -> void:
 		_woohoo_label.visible = true
 		_woohoo_timer = woohoo_display_time
 	else:
-		_wife_label.text = "No? Aww, I'm sorry. Dinner's ready soon!"
+		_wife_label.text = "No? Aww, I'm sorry. Come home whenever you get the chance!"
 		_wife_kill_timer = wife_kill_delay
 
 
@@ -770,6 +796,11 @@ func _on_tutorial_stage_changed(stage_index: int) -> void:
 		_tutorial_instruction_timer = tutorial_instruction_interval
 	else:
 		_tutorial_label.visible = false
+
+
+func _on_afternoon_started() -> void:
+	_afternoon_label.visible = true
+	_afternoon_timer = afternoon_display_time
 
 
 func _on_tutorial_complete() -> void:
