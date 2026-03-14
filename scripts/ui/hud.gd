@@ -47,6 +47,8 @@ var _danger_label: Label
 var _danger_vignette: ColorRect
 var _nice_air_label: Label
 var _nice_air_time: float = 0.0
+var _trick_label: Label
+var _trick_label_timer: float = 0.0
 var _player: Node
 var _level_label: Label
 var _skip_btn: Button
@@ -218,11 +220,28 @@ func _ready() -> void:
 	_nice_air_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_nice_air_label)
 
+	_trick_label = Label.new()
+	_trick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_trick_label.anchor_left = 1.0
+	_trick_label.anchor_right = 1.0
+	_trick_label.anchor_top = 1.0
+	_trick_label.anchor_bottom = 1.0
+	_trick_label.offset_left = -280.0
+	_trick_label.offset_right = -12.0
+	_trick_label.offset_top = -52.0
+	_trick_label.offset_bottom = -12.0
+	_trick_label.add_theme_font_size_override("font_size", 22)
+	_trick_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
+	_trick_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trick_label.visible = false
+	add_child(_trick_label)
+
 	_player = get_tree().get_first_node_in_group("player")
 	if _player:
 		_player.stance_changed.connect(_on_stance_changed)
 		_player.wipeout_danger.connect(_on_wipeout_danger)
 		_player.nice_air.connect(_on_nice_air)
+		_player.trick_named.connect(_on_trick_named)
 	_death_overlay.color = SCREEN_OVERLAY_COLOR
 	_build_controls_screen()
 	_build_customize_screen()
@@ -310,6 +329,11 @@ func _process(delta: float) -> void:
 			_nice_air_label.visible = false
 			_nice_air_time = 0.0
 
+	if _trick_label.visible:
+		_trick_label_timer -= delta
+		if _trick_label_timer <= 0.0:
+			_trick_label.visible = false
+
 	if _wow_label.visible:
 		if _wow_timer > 0.0:
 			_wow_timer -= delta
@@ -318,7 +342,7 @@ func _process(delta: float) -> void:
 		if is_instance_valid(_player):
 			var cam := get_viewport().get_camera_3d()
 			if cam:
-				var screen_pos := cam.unproject_position(_player.global_position + Vector3(0, 2.2, 0))
+				var screen_pos := cam.unproject_position(_player.global_position + Vector3(0, 5.0, 0))
 				_wow_label.position = screen_pos + Vector2(-_wow_label.size.x * 0.5, 0.0)
 
 	if GameManager.state == GameManager.State.PLAYING:
@@ -380,6 +404,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_wife_label.visible = false
 		_woohoo_label.visible = false
 		_wow_label.visible = false
+		_trick_label.visible = false
 		_wife_call_active = false
 		_wife_kill_timer = 0.0
 		_wow_timer = 0.0
@@ -652,6 +677,14 @@ func _on_nice_air(_air_time: float) -> void:
 		return
 	_nice_air_time = 0.0
 	_nice_air_label.visible = true
+
+
+func _on_trick_named(trick: String) -> void:
+	if GameManager.state != GameManager.State.PLAYING:
+		return
+	_trick_label.text = trick
+	_trick_label.visible = true
+	_trick_label_timer = 2.5
 
 
 func _on_song_changed(song_name: String) -> void:

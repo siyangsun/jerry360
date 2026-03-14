@@ -86,6 +86,7 @@ enum WipeoutReason { NONE, CONFLICT, AIR_YAW, AIR_TILT }
 signal stance_changed(goofy: bool)
 signal wipeout_danger(intensity: float, reason: WipeoutReason)
 signal nice_air(air_time: float)
+signal trick_named(trick: String)
 
 var is_goofy: bool = false
 var _is_dead: bool = false
@@ -113,6 +114,12 @@ var _turn_burst_dir: float = 0.0
 
 var _jerry_material: StandardMaterial3D
 var _board_material: StandardMaterial3D
+
+var _trick_had_rail: bool = false
+var _trick_finalize_timer: float = 0.0
+var _pending_trick_spin: float = 0.0
+var _pending_trick_air_time: float = 0.0
+var _pending_had_rail: bool = false
 
 var _board_yaw: float = 0.0    # board facing angle offset from world forward (rad, + = right)
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
@@ -200,6 +207,7 @@ func _physics_process(delta: float) -> void:
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
 	_handle_landing()
+	_tick_trick_finalize(delta)
 	_handle_lean_forward(delta)
 	_handle_lean_back(delta)
 	_handle_snow_terrain_drag(delta)
@@ -474,52 +482,66 @@ func _handle_landing() -> void:
 		SfxManager.play_landing()
 		if not _is_on_rail():
 			_snow_particles.restart()
-		var leaning_back_on_land := Input.is_action_pressed("lean_back")
-		var spin := absf(_air_spin_y)
-		if _air_time >= min_trick_air_time and spin >= min_trick_spin:
-			var nearest_n := maxf(1.0, roundf(spin / PI))
-			var overshoot := absf(spin - nearest_n * PI)
-			var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
-			var air_factor := clampf(_air_time / big_air_time, 0.0, 1.0)
-			var crash_threshold := lerpf(
-				lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
-				deg_to_rad(crash_threshold_big_air_deg),
-				air_factor)
-			if leaning_back_on_land:
-				crash_threshold += deg_to_rad(lean_back_landing_bonus_deg)
-			if overshoot >= crash_threshold:
+
+		if _is_on_rail():
+			# Rail landing — mark rail involvement, keep trick active
+			if _air_time > 0.0:
+				_trick_had_rail = true
+		else:
+			# Solid ground landing — run wipeout checks, start finalize timer
+			var leaning_back_on_land := Input.is_action_pressed("lean_back")
+			var spin := absf(_air_spin_y)
+			if _air_time >= min_trick_air_time and spin >= min_trick_spin:
+				var nearest_n := maxf(1.0, roundf(spin / PI))
+				var overshoot := absf(spin - nearest_n * PI)
+				var speed_ratio := clampf((GameManager.current_speed - GameManager.BASE_SPEED) / (GameManager.MAX_SPEED - GameManager.BASE_SPEED), 0.0, 1.0)
+				var air_factor := clampf(_air_time / big_air_time, 0.0, 1.0)
+				var crash_threshold := lerpf(
+					lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
+					deg_to_rad(crash_threshold_big_air_deg),
+					air_factor)
+				if leaning_back_on_land:
+					crash_threshold += deg_to_rad(lean_back_landing_bonus_deg)
+				if overshoot >= crash_threshold:
+					_air_spin_y = 0.0
+					_air_time = 0.0
+					_trick_had_rail = false
+					_start_wipeout()
+					_was_on_floor = on_floor
+					return
+				if int(nearest_n) % 2 == 1:
+					is_goofy = !is_goofy
+					stance_changed.emit(is_goofy)
+				if overshoot >= stomp_threshold:
+					GameManager.current_speed = maxf(GameManager.current_speed - sloppy_speed_penalty, GameManager.BASE_SPEED)
+				else:
+					ScoreManager.add_trick(true)
+			var tilt_limit := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_on_land else 1.0)
+			if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= tilt_limit:
 				_air_spin_y = 0.0
 				_air_time = 0.0
+				_trick_had_rail = false
 				_start_wipeout()
 				_was_on_floor = on_floor
 				return
-			if int(nearest_n) % 2 == 1:
-				is_goofy = !is_goofy
-				stance_changed.emit(is_goofy)
-			if overshoot >= stomp_threshold:
-				GameManager.current_speed = maxf(GameManager.current_speed - sloppy_speed_penalty, GameManager.BASE_SPEED)
-			else:
-				ScoreManager.add_trick(true)
-		var tilt_limit := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_on_land else 1.0)
-		if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= tilt_limit:
+			var stance_after := PI if is_goofy else 0.0
+			if is_instance_valid(mesh_pivot):
+				mesh_pivot.rotation.y = stance_after + wrapf(mesh_pivot.rotation.y - stance_after, -PI, PI)
+			var residual := wrapf(_air_spin_y, -PI, PI)
+			if abs(residual) > recovery_yaw_min:
+				_yaw_recovery = true
+				_lean_vel_x = clampf(sin(residual) * GameManager.current_speed * recovery_lateral_factor, -max_lateral_speed, max_lateral_speed)
+			if abs(residual) >= boost_threshold:
+				_boost_multiplier = boost_amount
+				_boost_timer = boost_duration
+			_pending_trick_spin = _air_spin_y
+			_pending_trick_air_time = _air_time
+			_pending_had_rail = _trick_had_rail
+			_trick_had_rail = false
+			_trick_finalize_timer = 0.5
+			ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed)
 			_air_spin_y = 0.0
 			_air_time = 0.0
-			_start_wipeout()
-			_was_on_floor = on_floor
-			return
-		var stance_after := PI if is_goofy else 0.0
-		if is_instance_valid(mesh_pivot):
-			mesh_pivot.rotation.y = stance_after + wrapf(mesh_pivot.rotation.y - stance_after, -PI, PI)
-		var residual := wrapf(_air_spin_y, -PI, PI)
-		if abs(residual) > recovery_yaw_min:
-			_yaw_recovery = true
-			_lean_vel_x = clampf(sin(residual) * GameManager.current_speed * recovery_lateral_factor, -max_lateral_speed, max_lateral_speed)
-		if abs(residual) >= boost_threshold:
-			_boost_multiplier = boost_amount
-			_boost_timer = boost_duration
-		ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed)
-		_air_spin_y = 0.0
-		_air_time = 0.0
 	elif not on_floor and _was_on_floor:
 		SfxManager.play_airborne()
 		_nice_air_shown = false
@@ -622,6 +644,11 @@ func _start_wipeout() -> void:
 	SfxManager.set_on_snow(false)
 	ScoreManager.reset_combo()
 	_snow_particles.restart()
+	_trick_had_rail = false
+	_trick_finalize_timer = 0.0
+	_pending_trick_spin = 0.0
+	_pending_trick_air_time = 0.0
+	_pending_had_rail = false
 
 
 func _handle_wipeout(delta: float) -> void:
@@ -665,6 +692,32 @@ func _end_wipeout() -> void:
 
 func _end_recovery() -> void:
 	_yaw_recovery = false
+
+
+func _tick_trick_finalize(delta: float) -> void:
+	if _trick_finalize_timer <= 0.0:
+		return
+	_trick_finalize_timer -= delta
+	if _trick_finalize_timer <= 0.0:
+		_trick_finalize_timer = 0.0
+		var trick := _get_trick_name(_pending_trick_spin, _pending_trick_air_time)
+		if trick != "":
+			if _pending_had_rail:
+				trick = "Rail Grind " + trick
+			trick_named.emit(trick)
+		_pending_had_rail = false
+
+
+func _get_trick_name(spin_y: float, air_time: float) -> String:
+	if air_time < min_trick_air_time:
+		return ""
+	var spin := absf(spin_y)
+	if spin < min_trick_spin:
+		return "Straight Air" if air_time >= big_air_time else ""
+	var n := int(maxf(1.0, roundf(spin / PI)))
+	var degrees := n * 180
+	var direction := "Frontside" if spin_y > 0.0 else "Backside"
+	return "%s %d" % [direction, degrees]
 
 
 func _is_on_rail() -> bool:
@@ -759,6 +812,11 @@ func _apply_appearance() -> void:
 
 func _on_game_started() -> void:
 	_apply_appearance()
+	_trick_had_rail = false
+	_trick_finalize_timer = 0.0
+	_pending_trick_spin = 0.0
+	_pending_trick_air_time = 0.0
+	_pending_had_rail = false
 	_is_dead = false
 	is_goofy = false
 	stance_changed.emit(false)
