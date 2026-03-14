@@ -8,6 +8,8 @@ var combo_multiplier: float = 1.0
 var fun: float = 0.0
 var fun_rate: float = 0.0
 var is_goofy: bool = false
+var tricks_landed: int = 0
+var max_combo: int = 0
 
 const COMBO_MULT_PER_COUNT := 0.25  # score multiplier added per trick in a combo (stacks up)
 const COMBO_MAX_MULTIPLIER := 4.0   # highest possible score multiplier, no matter how big the combo
@@ -29,16 +31,21 @@ signal fun_updated(fun: float)
 func _ready() -> void:
 	_load_high_score()
 	GameManager.state_changed.connect(_on_state_changed)
+	GameManager.game_started.connect(_on_game_started)
+
+
+func _on_game_started() -> void:
+	distance = 0.0
+	fun = 0.0
+	fun_rate = 0.0
+	is_goofy = false
+	tricks_landed = 0
+	max_combo = 0
+	reset_combo()
 
 
 func _on_state_changed(new_state: GameManager.State) -> void:
-	if new_state == GameManager.State.PLAYING:
-		distance = 0.0
-		fun = 0.0
-		fun_rate = 0.0
-		is_goofy = false
-		reset_combo()
-	elif new_state == GameManager.State.DEAD:
+	if new_state == GameManager.State.DEAD:
 		deaths += 1
 		reset_combo()
 		_check_high_score()
@@ -66,6 +73,9 @@ func add_fun_airtime(air_time: float, speed: float) -> void:
 
 func add_trick(is_stomp: bool) -> void:
 	combo_count += 1
+	tricks_landed += 1
+	if combo_count > max_combo:
+		max_combo = combo_count
 	combo_multiplier = minf(1.0 + combo_count * COMBO_MULT_PER_COUNT, COMBO_MAX_MULTIPLIER)
 	combo_changed.emit(combo_count, combo_multiplier)
 	trick_landed.emit(is_stomp)

@@ -6,6 +6,7 @@ extends CanvasLayer
 @onready var _death_overlay: ColorRect = $DeathScreen/GrayOverlay
 @onready var menu_screen: Control = $MenuScreen
 @onready var _controls_screen: Control = $ControlsScreen
+@onready var _pause_screen: Control = $PauseScreen
 
 const SCREEN_OVERLAY_COLOR := Color(0.15, 0.15, 0.15, 0.3)
 
@@ -56,6 +57,7 @@ var _woohoo_timer: float = 0.0
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_level_label = Label.new()
 	_level_label.add_theme_font_size_override("font_size", 18)
 	_level_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -180,6 +182,7 @@ func _ready() -> void:
 	MusicManager.song_changed.connect(_on_song_changed)
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	GameManager.state_changed.connect(_on_state_changed)
+	GameManager.game_started.connect(_on_game_started)
 	GameManager.wife_calling.connect(_on_wife_calling)
 	_nice_air_label = Label.new()
 	_nice_air_label.text = "nice air!"
@@ -343,6 +346,7 @@ func _on_combo_changed(count: int, multiplier: float) -> void:
 func _on_state_changed(new_state: GameManager.State) -> void:
 	menu_screen.visible = new_state == GameManager.State.MENU
 	_controls_screen.visible = false
+	_pause_screen.visible = new_state == GameManager.State.PAUSED
 	death_screen.visible = new_state == GameManager.State.DEAD
 	distance_label.visible = new_state == GameManager.State.PLAYING
 	_level_label.visible = new_state == GameManager.State.PLAYING
@@ -360,15 +364,6 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_wife_kill_timer = 0.0
 		_wow_timer = 0.0
 
-	if new_state == GameManager.State.PLAYING:
-		_elapsed = 0.0
-		_lap_time = 0.0
-		_next_lap_dist = LAP_DISTANCE
-		_wife_call_active = false
-		_wife_call_timer = 0.0
-		_wife_kill_timer = 0.0
-		_woohoo_timer = 0.0
-
 	if new_state == GameManager.State.DEAD:
 		if GameManager.wife_killed_jerry:
 			death_label.text = "should probably get on linkedin"
@@ -376,8 +371,12 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 			var dist := ScoreManager.distance
 			var best := ScoreManager.high_score
 			var deaths := ScoreManager.deaths
+			var tricks := ScoreManager.tricks_landed
+			var top_combo := ScoreManager.max_combo
 			var first_line := "Got a little too goofy." if _is_goofy else "He fell."
-			death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, best, deaths]
+			var trick_str := "%d trick%s" % [tricks, "s" if tricks != 1 else ""]
+			var combo_str := ("best combo x%d" % top_combo) if top_combo > 1 else "no combos"
+			death_label.text = "%s\n%.0f meters — not bad for a Tuesday.\n%s  |  %s\n\nBest: %.0f m  |  Falls: %d" % [first_line, dist, trick_str, combo_str, best, deaths]
 
 
 func _on_stance_changed(goofy: bool) -> void:
@@ -420,8 +419,26 @@ func _on_level_changed(level_name: String, level_number: int) -> void:
 	_level_label.visible = GameManager.state == GameManager.State.PLAYING
 
 
+func _on_game_started() -> void:
+	_elapsed = 0.0
+	_lap_time = 0.0
+	_next_lap_dist = LAP_DISTANCE
+	_wife_call_active = false
+	_wife_call_timer = 0.0
+	_wife_kill_timer = 0.0
+	_woohoo_timer = 0.0
+
+
 func _on_try_again_pressed() -> void:
 	GameManager.start_game()
+
+
+func _on_resume_pressed() -> void:
+	GameManager.resume_game()
+
+
+func _on_menu_pressed() -> void:
+	GameManager.return_to_menu()
 
 
 func _on_nice_air(_air_time: float) -> void:

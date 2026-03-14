@@ -135,6 +135,7 @@ var _capsule: CapsuleShape3D
 func _ready() -> void:
 	add_to_group("player")
 	GameManager.state_changed.connect(_on_state_changed)
+	GameManager.game_started.connect(_on_game_started)
 	_spark_particles = _make_spark_particles()
 	add_child(_spark_particles)
 	_snow_particles = _make_snow_particles()
@@ -733,39 +734,43 @@ func _make_snow_particles() -> GPUParticles3D:
 	return p
 
 
+func _on_game_started() -> void:
+	_is_dead = false
+	is_goofy = false
+	stance_changed.emit(false)
+	velocity = Vector3.ZERO
+	position = Vector3(0.0, 3.0, 0.0)
+	_air_spin_y = 0.0
+	_air_time = 0.0
+	_is_wiping_out = false
+	_wipeout_timer = 0.0
+	_rail_spin_acc = 0.0
+	_rail_tricks = 0
+	_was_on_rail = false
+	_was_on_snow = false
+	_boost_multiplier = 1.0
+	_boost_timer = 0.0
+	_was_on_floor = false
+	_smooth_vel_x = 0.0
+	_board_yaw = 0.0
+	_board_yaw_vel = 0.0
+	_lean_vel_x = 0.0
+	_conflict_timer = 0.0
+	_charge_timer = 0.0
+	_charge_amount = 0.0
+	_charge_release_window_timer = 0.0
+	_jump_buffer_timer = 0.0
+	_squat_root.scale = Vector3.ONE
+	_wipeout_danger_intensity = 0.0
+	_wipeout_danger_reason = WipeoutReason.NONE
+	wipeout_danger.emit(0.0, WipeoutReason.NONE)
+	_spark_particles.emitting = false
+	_snow_particles.emitting = false
+	_snow_particles.one_shot = true
+	_snow_particles.explosiveness = 1.0
+	_end_recovery()
+
+
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.PLAYING:
 		_is_dead = false
-		is_goofy = false
-		stance_changed.emit(false)
-		velocity = Vector3.ZERO
-		position = Vector3(0.0, 3.0, 0.0)
-		_air_spin_y = 0.0
-		_air_time = 0.0
-		_is_wiping_out = false
-		_wipeout_timer = 0.0
-		_rail_spin_acc = 0.0
-		_rail_tricks = 0
-		_was_on_rail = false
-		_was_on_snow = false
-		_boost_multiplier = 1.0
-		_boost_timer = 0.0
-		_was_on_floor = false
-		_smooth_vel_x = 0.0
-		_board_yaw = 0.0
-		_board_yaw_vel = 0.0
-		_lean_vel_x = 0.0
-		_conflict_timer = 0.0
-		_charge_timer = 0.0
-		_charge_amount = 0.0
-		_charge_release_window_timer = 0.0
-		_jump_buffer_timer = 0.0
-		_squat_root.scale = Vector3.ONE
-		_wipeout_danger_intensity = 0.0
-		_wipeout_danger_reason = WipeoutReason.NONE
-		wipeout_danger.emit(0.0, WipeoutReason.NONE)
-		_spark_particles.emitting = false
-		_snow_particles.emitting = false
-		_snow_particles.one_shot = true
-		_snow_particles.explosiveness = 1.0
-		_end_recovery()

@@ -32,6 +32,7 @@ var _wife_call_pending: bool = false
 signal state_changed(new_state: State)
 signal speed_changed(new_speed: float)
 signal wife_calling()
+signal game_started
 
 
 func _ready() -> void:
@@ -47,6 +48,7 @@ func start_game() -> void:
 	_play_elapsed = 0.0
 	_call_minute = 0
 	_wife_call_pending = false
+	game_started.emit()
 	_set_state(State.PLAYING)
 
 

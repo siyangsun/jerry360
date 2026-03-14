@@ -148,6 +148,7 @@ func _ready() -> void:
 	if not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player") as CharacterBody3D
 	GameManager.state_changed.connect(_on_state_changed)
+	GameManager.game_started.connect(_reset)
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()
 
@@ -814,9 +815,8 @@ func _make_display_name(base: String) -> String:
 		_: return base
 
 
-func _on_state_changed(new_state: GameManager.State) -> void:
-	if new_state == GameManager.State.PLAYING:
-		_reset()
+func _on_state_changed(_new_state: GameManager.State) -> void:
+	pass
 
 
 func _reset() -> void:

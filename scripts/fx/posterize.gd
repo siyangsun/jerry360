@@ -34,6 +34,7 @@ func _ready() -> void:
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	ScoreManager.trick_landed.connect(_on_trick_landed)
 	GameManager.state_changed.connect(_on_state_changed)
+	GameManager.game_started.connect(_on_game_started)
 	_player = get_tree().get_first_node_in_group("player") as CharacterBody3D
 
 
@@ -68,13 +69,15 @@ func _on_trick_landed(is_stomp: bool) -> void:
 		_flash_timer = STOMP_FLASH_DURATION
 
 
+func _on_game_started() -> void:
+	_combo_target_levels = BASE_LEVELS
+	_target_levels = BASE_LEVELS
+	_current_levels = BASE_LEVELS
+	_flash_timer = 0.0
+	_current_speed_lines = 0.0
+
+
 func _on_state_changed(new_state: GameManager.State) -> void:
-	if new_state == GameManager.State.PLAYING:
-		_combo_target_levels = BASE_LEVELS
-		_target_levels = BASE_LEVELS
-		_current_levels = BASE_LEVELS
-		_flash_timer = 0.0
-		_current_speed_lines = 0.0
 	if new_state == GameManager.State.DEAD:
 		_current_speed_lines = 0.0
 		material.set_shader_parameter("speed_lines", 0.0)
