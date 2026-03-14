@@ -370,6 +370,15 @@ func _process(delta: float) -> void:
 			_nice_air_label.visible = false
 			_nice_air_time = 0.0
 
+	if _wow_label.visible and is_instance_valid(_player):
+		var cam := _player.get_viewport().get_camera_3d()
+		if cam:
+			var sub_size := Vector2(_player.get_viewport().size)
+			var hud_size := Vector2(get_viewport().size)
+			var screen_pos := cam.unproject_position(_player.global_position + Vector3(0, 2.5, 0))
+			screen_pos *= hud_size / sub_size
+			_wow_label.position = screen_pos + Vector2(-_wow_label.size.x * 0.5, -_wow_label.size.y)
+
 	if _trick_label.visible:
 		_trick_label_timer -= delta
 		if _trick_label_timer <= 0.0:
@@ -380,11 +389,6 @@ func _process(delta: float) -> void:
 			_wow_timer -= delta
 			if _wow_timer <= 0.0:
 				_wow_label.visible = false
-		if is_instance_valid(_player):
-			var cam := get_viewport().get_camera_3d()
-			if cam:
-				var screen_pos := cam.unproject_position(_player.global_position + Vector3(0, 5.0, 0))
-				_wow_label.position = screen_pos + Vector2(-_wow_label.size.x * 0.5, 0.0)
 
 	if GameManager.state == GameManager.State.PLAYING:
 		_elapsed += delta
