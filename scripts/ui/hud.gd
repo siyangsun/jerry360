@@ -25,14 +25,14 @@ const BOARD_COLORS: Array[Color] = [
 ]
 
 const CONTROLS_DATA: Array[Dictionary] = [
-	{"key": "← →",        "desc": "Steer the board left and right"},
-	{"key": "A / D",       "desc": "Lean — shifts weight sideways and carves"},
-	{"key": "Space / ↑",   "desc": "Jump"},
-	{"key": "↓  (hold)",   "desc": "Charge a jump — release to launch higher"},
-	{"key": "W  (hold)",   "desc": "Lean forward — accelerate past top speed"},
-	{"key": "S  (hold)",   "desc": "Lean back — brake on the ground, or prep for landing"},
-	{"key": "← → (air)",  "desc": "Spin tricks — land straight to score and boost"},
-	{"key": "Esc",         "desc": "Pause"},
+	{"key": "Left / Right",        "desc": "Steer the board left and right"},
+	{"key": "A / D",               "desc": "Lean — shifts weight sideways and carves"},
+	{"key": "Space / Up",          "desc": "Jump"},
+	{"key": "Down (hold)",         "desc": "Charge a jump — release to launch higher"},
+	{"key": "W  (hold)",           "desc": "Lean forward — accelerate past top speed"},
+	{"key": "S  (hold)",           "desc": "Lean back — brake on the ground, or prep for landing"},
+	{"key": "Left / Right (air)",  "desc": "Spin tricks — land straight to score and boost"},
+	{"key": "Esc",                 "desc": "Pause"},
 ]
 
 const LAP_DISTANCE := 1000.0
