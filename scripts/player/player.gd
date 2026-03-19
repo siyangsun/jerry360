@@ -63,7 +63,7 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var min_trick_air_time := 0.3         # minimum time in the air before a spin counts as a trick (seconds)
 @export var min_trick_spin := 0.8             # minimum spin to count as a trick (roughly half a rotation)
 @export var air_pitch_speed := TAU * 1.0      # pitch rotation speed in air (rad/s) — 360 deg/s = 360° per 1s
-@export var pitch_land_back_max_deg := 15.0   # max backward pitch at landing (deg) to avoid wipeout
+@export var pitch_land_back_max_deg := 25.0   # max backward pitch at landing (deg) to avoid wipeout
 @export var stomp_threshold := PI / 12.0      # within this angle of a clean landing, it's a perfect stomp (15°)
 @export var sloppy_speed_penalty := 15.0      # speed lost for landing a trick slightly off-angle
 @export var wipeout_duration := 2.2           # how long a full wipeout lasts (seconds)
