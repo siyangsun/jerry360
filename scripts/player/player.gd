@@ -12,8 +12,6 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var ramp_jump_factor := 0.8            # how much ramp steepness × speed boosts the jump
 @export var charge_max_time := 0.6              # how long to hold down to reach full charge (seconds)
 @export var charge_jump_boost := 7.0            # extra jump height added at full charge
-@export var charge_release_window := 0.1        # seconds after releasing down where a charged jump still fires
-@export var jump_buffer_time := 0.2             # how long a jump input is remembered while still holding down (seconds)
 @export var charge_squat_scale := 0.825         # how much Jerry squishes down at full charge (fraction of normal height)
 @export var wall_gravity := 18.0                # how strongly the side walls pull Jerry back toward center
 @export var air_lean_friction_factor := 0.4     # sideways drift slows down slower in the air (fraction of normal)
@@ -78,7 +76,6 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var board_turn_brake := 9.0           # how quickly turn speed ramps down when releasing a turn key
 @export var conflict_wipeout_time := 0.45     # how long you can lean and turn against each other before wiping out (seconds)
 @export var conflict_min_speed := 14.0        # minimum speed at which opposing lean+turn can cause a wipeout
-@export var squat_land_window := 0.5          # seconds after a sloppy landing to press squat and absorb the speed penalty
 
 # ── Physics laws — do not tune ────────────────────────────────────────────────
 const GRAVITY := 24.0
@@ -130,13 +127,8 @@ var _board_yaw: float = 0.0    # board facing angle offset from world forward (r
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
 var _conflict_timer: float = 0.0
-var _squat_land_timer: float = 0.0
-var _squat_held_at_land: bool = false
-var _squat_land_pending_penalty: float = 0.0
 var _charge_timer: float = 0.0
 var _charge_amount: float = 0.0
-var _charge_release_window_timer: float = 0.0
-var _jump_buffer_timer: float = 0.0
 var _wipeout_danger_intensity: float = 0.0
 var _wipeout_danger_reason: WipeoutReason = WipeoutReason.NONE
 
@@ -189,7 +181,7 @@ func _physics_process(delta: float) -> void:
 
 	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
 	_is_leaning_back = is_on_floor() and Input.is_action_pressed("lean_back") and not _is_leaning_fwd
-	_is_squatting = is_on_floor() and Input.is_action_pressed("squat")
+	_is_squatting = is_on_floor() and Input.is_action_pressed("jump")
 
 	_handle_lean(delta)
 	_handle_board_turn(delta)
@@ -216,7 +208,6 @@ func _physics_process(delta: float) -> void:
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
 	_handle_landing()
-	_handle_squat_land(delta)
 	_tick_trick_finalize(delta)
 	_handle_lean_forward(delta)
 	_handle_lean_back(delta)
@@ -407,41 +398,25 @@ func _emit_danger(intensity: float, reason: WipeoutReason) -> void:
 
 
 func _handle_charge_jump(delta: float) -> void:
-	if _jump_buffer_timer > 0.0:
-		_jump_buffer_timer -= delta
 	if is_on_floor() and _is_squatting:
 		_charge_timer = minf(_charge_timer + delta, charge_max_time)
-		_charge_release_window_timer = 0.0
-	else:
-		if _charge_timer > 0.0:
-			_charge_amount = _charge_timer / charge_max_time
-			_charge_release_window_timer = charge_release_window
-			_charge_timer = 0.0
-			# Do not snap the scale — stay compressed until the jump fires or the window expires
-		if _charge_release_window_timer > 0.0:
-			_charge_release_window_timer -= delta
-			if _charge_release_window_timer <= 0.0:
-				_charge_release_window_timer = 0.0
-				_charge_amount = 0.0
+	elif not is_on_floor():
+		_charge_timer = 0.0
+		_charge_amount = 0.0
 
 
 func _handle_jump() -> void:
 	if not is_on_floor():
 		return
-	if Input.is_action_just_pressed("jump"):
-		if _is_squatting and _charge_timer > 0.0:
-			_jump_buffer_timer = jump_buffer_time  # buffer it — fires when Down is released
-			return
-		_fire_jump()
-	elif _jump_buffer_timer > 0.0 and _charge_release_window_timer > 0.0:
-		_jump_buffer_timer = 0.0
+	if Input.is_action_just_released("jump"):
+		_charge_amount = _charge_timer / charge_max_time
+		_charge_timer = 0.0
 		_fire_jump()
 
 
 func _fire_jump() -> void:
-	var boost := _charge_amount * charge_jump_boost if _charge_release_window_timer > 0.0 else 0.0
+	var boost := _charge_amount * charge_jump_boost
 	_charge_amount = 0.0
-	_charge_release_window_timer = 0.0
 	var base_slope_z := sin(deg_to_rad(LevelGenerator.DOWNHILL_TILT_ANGLE))
 	var ramp_z_excess := clampf(get_floor_normal().z - base_slope_z, 0.0, 1.0)
 	var ramp_boost := ramp_z_excess * GameManager.current_speed * ramp_jump_factor
@@ -522,9 +497,7 @@ func _handle_landing() -> void:
 					is_goofy = !is_goofy
 					stance_changed.emit(is_goofy)
 				if overshoot >= stomp_threshold:
-					_squat_land_pending_penalty = sloppy_speed_penalty
-					_squat_land_timer = squat_land_window
-					_squat_held_at_land = Input.is_action_pressed("squat")
+					GameManager.current_speed = maxf(GameManager.current_speed - sloppy_speed_penalty, GameManager.BASE_SPEED)
 				else:
 					ScoreManager.add_trick(true)
 			if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= land_tilt_wipeout:
@@ -570,20 +543,6 @@ func _handle_landing() -> void:
 		_nice_air_shown = false
 	_was_on_floor = on_floor
 
-
-func _handle_squat_land(delta: float) -> void:
-	if _squat_land_timer <= 0.0:
-		return
-	if Input.is_action_just_pressed("squat") and not _squat_held_at_land:
-		_squat_land_timer = 0.0
-		_squat_land_pending_penalty = 0.0
-		_yaw_recovery = false
-		return
-	_squat_land_timer -= delta
-	if _squat_land_timer <= 0.0:
-		_squat_land_timer = 0.0
-		GameManager.current_speed = maxf(GameManager.current_speed - _squat_land_pending_penalty, GameManager.BASE_SPEED)
-		_squat_land_pending_penalty = 0.0
 
 
 func _tick_boost(delta: float) -> void:
@@ -669,12 +628,8 @@ func _start_wipeout() -> void:
 	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
-	_squat_land_timer = 0.0
-	_squat_land_pending_penalty = 0.0
 	_charge_timer = 0.0
 	_charge_amount = 0.0
-	_charge_release_window_timer = 0.0
-	_jump_buffer_timer = 0.0
 	_wipeout_danger_intensity = 0.0
 	_wipeout_danger_reason = WipeoutReason.NONE
 	wipeout_danger.emit(0.0, WipeoutReason.NONE)
@@ -890,13 +845,8 @@ func _on_game_started() -> void:
 	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
-	_squat_land_timer = 0.0
-	_squat_held_at_land = false
-	_squat_land_pending_penalty = 0.0
 	_charge_timer = 0.0
 	_charge_amount = 0.0
-	_charge_release_window_timer = 0.0
-	_jump_buffer_timer = 0.0
 	_squat_root.scale = Vector3.ONE
 	_wipeout_danger_intensity = 0.0
 	_wipeout_danger_reason = WipeoutReason.NONE
