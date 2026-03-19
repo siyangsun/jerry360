@@ -76,6 +76,7 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var board_turn_brake := 9.0           # how quickly turn speed ramps down when releasing a turn key
 @export var conflict_wipeout_time := 0.45     # how long you can lean and turn against each other before wiping out (seconds)
 @export var conflict_min_speed := 14.0        # minimum speed at which opposing lean+turn can cause a wipeout
+@export var squat_land_window := 0.5          # seconds after a sloppy landing to press squat and absorb the speed penalty
 
 # ── Physics laws — do not tune ────────────────────────────────────────────────
 const GRAVITY := 24.0
@@ -125,6 +126,9 @@ var _board_yaw: float = 0.0    # board facing angle offset from world forward (r
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
 var _conflict_timer: float = 0.0
+var _squat_land_timer: float = 0.0
+var _squat_held_at_land: bool = false
+var _squat_land_pending_penalty: float = 0.0
 var _charge_timer: float = 0.0
 var _charge_amount: float = 0.0
 var _charge_release_window_timer: float = 0.0
@@ -207,6 +211,7 @@ func _physics_process(delta: float) -> void:
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
 	_handle_landing()
+	_handle_squat_land(delta)
 	_tick_trick_finalize(delta)
 	_handle_lean_forward(delta)
 	_handle_lean_back(delta)
@@ -513,7 +518,9 @@ func _handle_landing() -> void:
 					is_goofy = !is_goofy
 					stance_changed.emit(is_goofy)
 				if overshoot >= stomp_threshold:
-					GameManager.current_speed = maxf(GameManager.current_speed - sloppy_speed_penalty, GameManager.BASE_SPEED)
+					_squat_land_pending_penalty = sloppy_speed_penalty
+					_squat_land_timer = squat_land_window
+					_squat_held_at_land = Input.is_action_pressed("squat")
 				else:
 					ScoreManager.add_trick(true)
 			var tilt_limit := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_on_land else 1.0)
@@ -546,6 +553,21 @@ func _handle_landing() -> void:
 		SfxManager.play_airborne()
 		_nice_air_shown = false
 	_was_on_floor = on_floor
+
+
+func _handle_squat_land(delta: float) -> void:
+	if _squat_land_timer <= 0.0:
+		return
+	if Input.is_action_just_pressed("squat") and not _squat_held_at_land:
+		_squat_land_timer = 0.0
+		_squat_land_pending_penalty = 0.0
+		_yaw_recovery = false
+		return
+	_squat_land_timer -= delta
+	if _squat_land_timer <= 0.0:
+		_squat_land_timer = 0.0
+		GameManager.current_speed = maxf(GameManager.current_speed - _squat_land_pending_penalty, GameManager.BASE_SPEED)
+		_squat_land_pending_penalty = 0.0
 
 
 func _tick_boost(delta: float) -> void:
@@ -631,6 +653,8 @@ func _start_wipeout() -> void:
 	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
+	_squat_land_timer = 0.0
+	_squat_land_pending_penalty = 0.0
 	_charge_timer = 0.0
 	_charge_amount = 0.0
 	_charge_release_window_timer = 0.0
@@ -838,6 +862,9 @@ func _on_game_started() -> void:
 	_board_yaw_vel = 0.0
 	_lean_vel_x = 0.0
 	_conflict_timer = 0.0
+	_squat_land_timer = 0.0
+	_squat_held_at_land = false
+	_squat_land_pending_penalty = 0.0
 	_charge_timer = 0.0
 	_charge_amount = 0.0
 	_charge_release_window_timer = 0.0
