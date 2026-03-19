@@ -35,6 +35,8 @@ func _ready() -> void:
 		var world_env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
 		if world_env:
 			_compat_env = world_env.environment
+			_compat_env.volumetric_fog_enabled = false
+			_compat_env.fog_aerial_perspective = 0.0
 			_compat_env.fog_enabled = true
 			_compat_env.fog_density = COMPAT_NORMAL_FOG_DENSITY
 	else:
