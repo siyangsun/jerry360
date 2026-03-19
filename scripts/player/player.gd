@@ -64,6 +64,8 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var lean_boost_decay := 15.0          # how fast Jerry slows back to normal after releasing lean forward
 @export var min_trick_air_time := 0.3         # minimum time in the air before a spin counts as a trick (seconds)
 @export var min_trick_spin := 0.8             # minimum spin to count as a trick (roughly half a rotation)
+@export var air_pitch_speed := TAU * 1.0      # pitch rotation speed in air (rad/s) — 360 deg/s = 360° per 1s
+@export var pitch_land_back_max_deg := 15.0   # max backward pitch at landing (deg) to avoid wipeout
 @export var stomp_threshold := PI / 12.0      # within this angle of a clean landing, it's a perfect stomp (15°)
 @export var sloppy_speed_penalty := 15.0      # speed lost for landing a trick slightly off-angle
 @export var wipeout_duration := 2.2           # how long a full wipeout lasts (seconds)
@@ -93,6 +95,7 @@ var is_goofy: bool = false
 var _is_dead: bool = false
 var _was_on_floor: bool = false
 var _air_spin_y: float = 0.0
+var _air_spin_x: float = 0.0
 var _air_time: float = 0.0
 var _nice_air_shown: bool = false
 var _is_wiping_out: bool = false
@@ -119,6 +122,7 @@ var _board_material: StandardMaterial3D
 var _trick_had_rail: bool = false
 var _trick_finalize_timer: float = 0.0
 var _pending_trick_spin: float = 0.0
+var _pending_trick_spin_x: float = 0.0
 var _pending_trick_air_time: float = 0.0
 var _pending_had_rail: bool = false
 
@@ -138,7 +142,8 @@ var _wipeout_danger_reason: WipeoutReason = WipeoutReason.NONE
 
 @onready var _squat_root: Node3D = $SquatRoot
 @onready var mesh_pivot: Node3D = $SquatRoot/MeshPivot
-@onready var snowboard_mesh: MeshInstance3D = $SnowboardMesh
+@onready var _board_pivot: Node3D = $BoardPivot
+@onready var snowboard_mesh: MeshInstance3D = $BoardPivot/SnowboardMesh
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 
 const COLLIDER_FULL_HEIGHT := 1.0
@@ -265,21 +270,23 @@ func _physics_process(delta: float) -> void:
 
 		var lean_target := -lean_input * lean_tilt_visual_scale - _lean_vel_x * lean_vel_tilt_visual_scale
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
-		var pitch_target := 0.0
-		if _is_leaning_fwd:
-			pitch_target = lean_forward_angle
-		elif _is_leaning_back:
-			pitch_target = lean_back_angle
-		elif not is_on_floor() and Input.is_action_pressed("lean_back"):
-			pitch_target = air_lean_back_angle
-		mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, pitch_target, 10.0 * delta)
+		if is_on_floor():
+			var pitch_target := 0.0
+			if _is_leaning_fwd:
+				pitch_target = lean_forward_angle
+			elif _is_leaning_back:
+				pitch_target = lean_back_angle
+			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, pitch_target, 10.0 * delta)
+		else:
+			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, _air_spin_x, air_spin_lerp_speed * delta)
 		var squat_y := lerpf(_squat_root.scale.y, lerpf(1.0, charge_squat_scale, _charge_timer / charge_max_time), 12.0 * delta)
 		_squat_root.scale = Vector3(1.0, squat_y, 1.0)
 		_capsule.height = COLLIDER_FULL_HEIGHT * squat_y
 		_collision_shape.position.y = _capsule.height * 0.5
-		if is_instance_valid(snowboard_mesh):
-			snowboard_mesh.rotation.y = mesh_pivot.rotation.y
-			snowboard_mesh.rotation.z = mesh_pivot.rotation.z
+		if is_instance_valid(_board_pivot):
+			_board_pivot.rotation = mesh_pivot.rotation
+			if _is_leaning_fwd:
+				_board_pivot.rotation.x = 0.0
 		if is_on_floor():
 			if not _is_on_rail():
 				var stance_offset := PI if is_goofy else 0.0
@@ -368,7 +375,6 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 
 	# — Air yaw danger: live preview of how badly you'd overshoot a clean landing —
 	if not is_on_floor() and _air_time >= min_trick_air_time:
-		var leaning_back_preview := Input.is_action_pressed("lean_back")
 		var spin := absf(_air_spin_y)
 		if spin >= min_trick_spin:
 			var nearest_n := maxf(1.0, roundf(spin / PI))
@@ -379,16 +385,13 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 				lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
 				deg_to_rad(crash_threshold_big_air_deg),
 				air_factor)
-			if leaning_back_preview:
-				crash_threshold += deg_to_rad(lean_back_landing_bonus_deg)
 			var yaw_intensity := clampf((residual - stomp_threshold) / (crash_threshold - stomp_threshold), 0.0, 1.0)
 			if yaw_intensity > best_intensity:
 				best_intensity = yaw_intensity
 				best_reason = WipeoutReason.AIR_YAW
 
 		# — Air tilt danger: live preview of landing-tilt wipeout risk —
-		var tilt_limit_preview := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_preview else 1.0)
-		var tilt_intensity := clampf(absf(_lean_vel_x) / tilt_limit_preview, 0.0, 1.0)
+		var tilt_intensity := clampf(absf(_lean_vel_x) / land_tilt_wipeout, 0.0, 1.0)
 		if tilt_intensity > best_intensity:
 			best_intensity = tilt_intensity
 			best_reason = WipeoutReason.AIR_TILT
@@ -476,6 +479,9 @@ func _handle_air_spin(delta: float) -> void:
 		if earned > _rail_tricks:
 			_rail_tricks = earned
 			ScoreManager.add_trick(false)
+	if not on_rail:
+		var pitch_input := Input.get_axis("pitch_forward", "pitch_back")
+		_air_spin_x += pitch_input * air_pitch_speed * delta
 	if is_instance_valid(mesh_pivot):
 		var stance_offset := PI if is_goofy else 0.0
 		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, stance_offset + _air_spin_y, air_spin_lerp_speed * delta)
@@ -494,7 +500,6 @@ func _handle_landing() -> void:
 				_trick_had_rail = true
 		else:
 			# Solid ground landing — run wipeout checks, start finalize timer
-			var leaning_back_on_land := Input.is_action_pressed("lean_back")
 			var spin := absf(_air_spin_y)
 			if _air_time >= min_trick_air_time and spin >= min_trick_spin:
 				var nearest_n := maxf(1.0, roundf(spin / PI))
@@ -505,10 +510,9 @@ func _handle_landing() -> void:
 					lerpf(deg_to_rad(crash_threshold_slow_deg), deg_to_rad(crash_threshold_fast_deg), speed_ratio),
 					deg_to_rad(crash_threshold_big_air_deg),
 					air_factor)
-				if leaning_back_on_land:
-					crash_threshold += deg_to_rad(lean_back_landing_bonus_deg)
 				if overshoot >= crash_threshold:
 					_air_spin_y = 0.0
+					_air_spin_x = 0.0
 					_air_time = 0.0
 					_trick_had_rail = false
 					_start_wipeout()
@@ -523,9 +527,18 @@ func _handle_landing() -> void:
 					_squat_held_at_land = Input.is_action_pressed("squat")
 				else:
 					ScoreManager.add_trick(true)
-			var tilt_limit := land_tilt_wipeout * (lean_back_tilt_factor if leaning_back_on_land else 1.0)
-			if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= tilt_limit:
+			if _air_time >= min_trick_air_time and absf(_lean_vel_x) >= land_tilt_wipeout:
 				_air_spin_y = 0.0
+				_air_spin_x = 0.0
+				_air_time = 0.0
+				_trick_had_rail = false
+				_start_wipeout()
+				_was_on_floor = on_floor
+				return
+			var pitch_residual := wrapf(_air_spin_x, -PI, PI)
+			if pitch_residual < 0.0 or pitch_residual > deg_to_rad(pitch_land_back_max_deg):
+				_air_spin_y = 0.0
+				_air_spin_x = 0.0
 				_air_time = 0.0
 				_trick_had_rail = false
 				_start_wipeout()
@@ -534,6 +547,7 @@ func _handle_landing() -> void:
 			var stance_after := PI if is_goofy else 0.0
 			if is_instance_valid(mesh_pivot):
 				mesh_pivot.rotation.y = stance_after + wrapf(mesh_pivot.rotation.y - stance_after, -PI, PI)
+				mesh_pivot.rotation.x = wrapf(mesh_pivot.rotation.x, -PI, PI)
 			var residual := wrapf(_air_spin_y, -PI, PI)
 			if abs(residual) > recovery_yaw_min:
 				_yaw_recovery = true
@@ -542,12 +556,14 @@ func _handle_landing() -> void:
 				_boost_multiplier = boost_amount
 				_boost_timer = boost_duration
 			_pending_trick_spin = _air_spin_y
+			_pending_trick_spin_x = _air_spin_x
 			_pending_trick_air_time = _air_time
 			_pending_had_rail = _trick_had_rail
 			_trick_had_rail = false
 			_trick_finalize_timer = 0.5
 			ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed)
 			_air_spin_y = 0.0
+			_air_spin_x = 0.0
 			_air_time = 0.0
 	elif not on_floor and _was_on_floor:
 		SfxManager.play_airborne()
@@ -671,8 +687,10 @@ func _start_wipeout() -> void:
 	_trick_had_rail = false
 	_trick_finalize_timer = 0.0
 	_pending_trick_spin = 0.0
+	_pending_trick_spin_x = 0.0
 	_pending_trick_air_time = 0.0
 	_pending_had_rail = false
+	_air_spin_x = 0.0
 
 
 func _handle_wipeout(delta: float) -> void:
@@ -724,7 +742,7 @@ func _tick_trick_finalize(delta: float) -> void:
 	_trick_finalize_timer -= delta
 	if _trick_finalize_timer <= 0.0:
 		_trick_finalize_timer = 0.0
-		var trick := _get_trick_name(_pending_trick_spin, _pending_trick_air_time)
+		var trick := _get_trick_name(_pending_trick_spin, _pending_trick_spin_x, _pending_trick_air_time)
 		if trick != "":
 			if _pending_had_rail:
 				trick = "Rail Grind " + trick
@@ -732,16 +750,24 @@ func _tick_trick_finalize(delta: float) -> void:
 		_pending_had_rail = false
 
 
-func _get_trick_name(spin_y: float, air_time: float) -> String:
+func _get_trick_name(spin_y: float, spin_x: float, air_time: float) -> String:
 	if air_time < min_trick_air_time:
 		return ""
-	var spin := absf(spin_y)
-	if spin < min_trick_spin:
+	var has_yaw := absf(spin_y) >= min_trick_spin
+	var flip_count := int((absf(spin_x) + deg_to_rad(pitch_land_back_max_deg)) / TAU)
+	if not has_yaw and flip_count == 0:
 		return "Straight Air" if air_time >= big_air_time else ""
-	var n := int(maxf(1.0, roundf(spin / PI)))
-	var degrees := n * 180
-	var direction := "Frontside" if spin_y > 0.0 else "Backside"
-	return "%s %d" % [direction, degrees]
+	var name := ""
+	if flip_count > 0:
+		var flip_dir := "Back" if spin_x > 0.0 else "Front"
+		name = "%sflip" % flip_dir if flip_count == 1 else "%d° %sflip" % [flip_count * 360, flip_dir]
+	if has_yaw:
+		var n := int(maxf(1.0, roundf(absf(spin_y) / PI)))
+		var degrees := n * 180
+		var direction := "Frontside" if spin_y > 0.0 else "Backside"
+		var yaw_part := "%s %d" % [direction, degrees]
+		name = (name + " + " + yaw_part) if name != "" else yaw_part
+	return name
 
 
 func _is_on_rail() -> bool:
@@ -839,8 +865,10 @@ func _on_game_started() -> void:
 	_trick_had_rail = false
 	_trick_finalize_timer = 0.0
 	_pending_trick_spin = 0.0
+	_pending_trick_spin_x = 0.0
 	_pending_trick_air_time = 0.0
 	_pending_had_rail = false
+	_air_spin_x = 0.0
 	_is_dead = false
 	is_goofy = false
 	stance_changed.emit(false)
