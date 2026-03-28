@@ -62,8 +62,10 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var lean_boost_decay := 15.0          # how fast Jerry slows back to normal after releasing lean forward
 @export var min_trick_air_time := 0.3         # minimum time in the air before a spin counts as a trick (seconds)
 @export var min_trick_spin := 0.8             # minimum spin to count as a trick (roughly half a rotation)
-@export var air_pitch_speed := TAU * 1.0      # pitch rotation speed in air (rad/s) — 360 deg/s = 360° per 1s
-@export var pitch_land_back_max_deg := 25.0   # max backward pitch at landing (deg) to avoid wipeout
+@export var air_pitch_speed := TAU * 0.72     # pitch rotation speed in air (rad/s) — max speed at full acceleration
+@export var air_pitch_accel := TAU * 1.8     # how fast pitch speed ramps up when holding flip input (rad/s²)
+@export var pitch_land_back_max_deg := 45.0   # max backward pitch at landing (deg) to avoid wipeout
+@export var pitch_land_fwd_max_deg := 25.0    # max forward over-rotation at landing (deg) to avoid wipeout
 @export var stomp_threshold := PI / 12.0      # within this angle of a clean landing, it's a perfect stomp (15°)
 @export var sloppy_speed_penalty := 15.0      # speed lost for landing a trick slightly off-angle
 @export var wipeout_duration := 2.2           # how long a full wipeout lasts (seconds)
@@ -123,6 +125,7 @@ var _pending_trick_spin_x: float = 0.0
 var _pending_trick_air_time: float = 0.0
 var _pending_had_rail: bool = false
 
+var _air_pitch_vel: float = 0.0  # current pitch angular velocity, accelerates when holding flip input
 var _board_yaw: float = 0.0    # board facing angle offset from world forward (rad, + = right)
 var _board_yaw_vel: float = 0.0  # current angular velocity of board yaw (rad/s)
 var _lean_vel_x: float = 0.0   # lean-only lateral velocity contribution
@@ -444,6 +447,7 @@ func _handle_air_spin(delta: float) -> void:
 	if is_on_floor() and not on_rail:
 		_rail_spin_acc = 0.0
 		_rail_tricks = 0
+		_air_pitch_vel = 0.0
 		return
 	var input := Input.get_axis("move_left", "move_right")
 	var spin_delta := input * air_turn_speed * delta
@@ -456,7 +460,11 @@ func _handle_air_spin(delta: float) -> void:
 			ScoreManager.add_trick(false)
 	if not on_rail:
 		var pitch_input := Input.get_axis("pitch_forward", "pitch_back")
-		_air_spin_x += pitch_input * air_pitch_speed * delta
+		if pitch_input != 0.0:
+			_air_pitch_vel = move_toward(_air_pitch_vel, pitch_input * air_pitch_speed, air_pitch_accel * delta)
+		else:
+			_air_pitch_vel = 0.0
+		_air_spin_x += _air_pitch_vel * delta
 	if is_instance_valid(mesh_pivot):
 		var stance_offset := PI if is_goofy else 0.0
 		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, stance_offset + _air_spin_y, air_spin_lerp_speed * delta)
@@ -509,7 +517,7 @@ func _handle_landing() -> void:
 				_was_on_floor = on_floor
 				return
 			var pitch_residual := wrapf(_air_spin_x, -PI, PI)
-			if pitch_residual < 0.0 or pitch_residual > deg_to_rad(pitch_land_back_max_deg):
+			if pitch_residual < -deg_to_rad(pitch_land_fwd_max_deg) or pitch_residual > deg_to_rad(pitch_land_back_max_deg):
 				_air_spin_y = 0.0
 				_air_spin_x = 0.0
 				_air_time = 0.0
@@ -646,6 +654,7 @@ func _start_wipeout() -> void:
 	_pending_trick_air_time = 0.0
 	_pending_had_rail = false
 	_air_spin_x = 0.0
+	_air_pitch_vel = 0.0
 
 
 func _handle_wipeout(delta: float) -> void:
@@ -824,6 +833,7 @@ func _on_game_started() -> void:
 	_pending_trick_air_time = 0.0
 	_pending_had_rail = false
 	_air_spin_x = 0.0
+	_air_pitch_vel = 0.0
 	_is_dead = false
 	is_goofy = false
 	stance_changed.emit(false)
