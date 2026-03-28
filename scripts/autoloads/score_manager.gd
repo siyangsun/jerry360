@@ -20,6 +20,7 @@ const COMBO_MAX_MULTIPLIER := 4.0   # highest possible score multiplier, no matt
 @export var fun_rail_rate_mult: float = 2.0     # fun rate multiplier while grinding a rail
 @export var fun_carve_rate_bonus: float = 0.5   # max additional fun rate when fully carving (added on top)
 @export var fun_goofy_mult: float = 1.5         # fun rate multiplier when riding goofy
+@export var fun_flip_mult: float = 3.0          # fun multiplier for tricks that include a front/backflip
 
 signal distance_updated(dist: float)
 signal new_high_score(dist: float)
@@ -66,8 +67,9 @@ func add_fun_continuous(speed: float, delta: float, on_rail: bool = false, carve
 	fun_updated.emit(fun)
 
 
-func add_fun_airtime(air_time: float, speed: float) -> void:
-	fun += pow(air_time, fun_airtime_exponent) * speed * fun_airtime_rate * combo_multiplier
+func add_fun_airtime(air_time: float, speed: float, has_flip: bool = false) -> void:
+	var flip_bonus := fun_flip_mult if has_flip else 1.0
+	fun += pow(air_time, fun_airtime_exponent) * speed * fun_airtime_rate * combo_multiplier * flip_bonus
 	fun_updated.emit(fun)
 
 
