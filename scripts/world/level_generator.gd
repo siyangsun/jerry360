@@ -87,6 +87,14 @@ const STEEP_TILT_ANGLE := 30.0      # tree tilt on steep runs (degrees)
 const NARROWS_FLOOR_WIDTH    := 8.0   # narrower riding surface for THE NARROWS level
 
 # Trees
+# Warning signs
+const SIGN_POST_WIDTH  := 0.07    # thickness of the sign post
+const SIGN_POST_HEIGHT := 2.0     # height of the post
+const SIGN_FACE_SIZE   := 0.55    # width/height of the diamond sign face
+const SIGN_FACE_THICK  := 0.05    # depth of the sign face
+const SIGN_COLOR       := Color(0.95, 0.82, 0.08)   # warning yellow
+const SIGN_POST_COLOR  := Color(0.80, 0.80, 0.80)   # light gray post
+
 const TREE_TRUNK_RADIUS := 0.30    # how thick tree trunks are
 const TREE_TRUNK_HEIGHT := 2.4     # how tall the trunk is before foliage starts
 const TREE_FOLIAGE_RADIUS := 1.6   # how wide the foliage cone is at the base
@@ -158,18 +166,18 @@ const LEVELS := [
 	{
 		"name": "THE GLADES",
 		"chunks": 5,
-		"tree": 0.35, "rail": 0.08, "mogul": 0.10, "ramp": 0.03, "bush": 0.20, "rock": 0.00,
+		"tree": 0.35, "rail": 0.08, "mogul": 0.10, "ramp": 0.03, "bush": 0.20, "rock": 0.00, "sign": 0.12,
 	},
 	{
 		"name": "THE CRAGS",
 		"chunks": 5,
-		"tree": 0.18, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.60,
+		"tree": 0.18, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.60, "sign": 0.15,
 	},
 	{
 		"name": "THE NARROWS",
 		"chunks": 5,
 		"floor_width": NARROWS_FLOOR_WIDTH,
-		"tree": 0.12, "rail": 0.30, "mogul": 0.20, "ramp": 0.15, "bush": 0.00, "rock": 0.18,
+		"tree": 0.12, "rail": 0.30, "mogul": 0.20, "ramp": 0.15, "bush": 0.00, "rock": 0.18, "sign": 0.10,
 	},
 	{
 		"name": "THE LIFT AREA",
@@ -179,7 +187,7 @@ const LEVELS := [
 	{
 		"name": "BIG AIR",
 		"chunks": 5,
-		"tree": 0.00, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.00, "big_ramp": 0.55,
+		"tree": 0.00, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.00, "big_ramp": 0.55, "sign": 0.20,
 	},
 ]
 
@@ -365,6 +373,10 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 			var ramp_length := randf_range(RAMP_LENGTH_MIN, RAMP_LENGTH_MAX) * scale
 			var ramp_width := (_active_floor_width + WALL_WIDTH * 2.0) * 0.95
 			root.add_child(_make_ramp(Vector3(0.0, 0.0, z), ramp_angle, ramp_length, ramp_width))
+		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0) + cfg.get("big_ramp", 0.0) + cfg.get("sign", 0.0):
+			var side := 1.0 if randf() > 0.5 else -1.0
+			var sx := side * randf_range(_active_floor_width * 0.3, _active_floor_width * 0.45)
+			root.add_child(_make_warning_sign(Vector3(sx, 0.0, z)))
 		z -= RAMP_SLOT_SPACING
 
 
@@ -617,6 +629,39 @@ func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+func _make_warning_sign(pos: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+	root.rotation_degrees.x = _active_tilt_angle
+
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = SIGN_POST_COLOR
+	post_mat.roughness = 0.6
+
+	var post := MeshInstance3D.new()
+	var post_box := BoxMesh.new()
+	post_box.size = Vector3(SIGN_POST_WIDTH, SIGN_POST_HEIGHT, SIGN_POST_WIDTH)
+	post.mesh = post_box
+	post.material_override = post_mat
+	post.position.y = SIGN_POST_HEIGHT * 0.5
+	root.add_child(post)
+
+	var sign_mat := StandardMaterial3D.new()
+	sign_mat.albedo_color = SIGN_COLOR
+	sign_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+	var face := MeshInstance3D.new()
+	var face_box := BoxMesh.new()
+	face_box.size = Vector3(SIGN_FACE_SIZE, SIGN_FACE_SIZE, SIGN_FACE_THICK)
+	face.mesh = face_box
+	face.material_override = sign_mat
+	face.position.y = SIGN_POST_HEIGHT + SIGN_FACE_SIZE * 0.5
+	face.rotation_degrees.z = 45.0  # diamond orientation
+	root.add_child(face)
+
+	return root
 
 
 # Connects crash detection to hit_area and adds a proximity sphere for close-call scoring.
