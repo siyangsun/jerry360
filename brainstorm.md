@@ -1,6 +1,7 @@
 # Ideas
 ### immediate features
 - more terrain; rocks of various shape, chasms, warning signs
+- holding S while turning visually does a sharper turn but actually lets you brake
 
 ### cool aesthetic things to add soon
 - character model (cosmetic)

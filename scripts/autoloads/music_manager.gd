@@ -17,6 +17,7 @@ const GAMEPLAY_SONGS: Array[String] = [
 	"res://assets/audio/music/heel hook.mp3",
 	"res://assets/audio/music/laguna liability.mp3",
 	"res://assets/audio/music/earnings per share.mp3",
+	"res://assets/audio/music/i miss my wife.mp3",
 ]
 
 const VOLUME_DB := -3.1
