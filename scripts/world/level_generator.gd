@@ -30,6 +30,8 @@ const RAMP_ANGLE_MAX := 0.270    # steepest possible ramp angle
 const RAMP_LENGTH_MIN := 5.0     # shortest possible ramp (meters)
 const RAMP_LENGTH_MAX := 15.0    # longest possible ramp (meters)
 const RAMP_WIDTH := 5.0          # how wide each ramp is
+const BIG_RAMP_LENGTH_SCALE_MIN := 2.0  # minimum length multiplier for big air ramps
+const BIG_RAMP_LENGTH_SCALE_MAX := 3.0  # maximum length multiplier for big air ramps
 const RAMP_THICKNESS := 0.1      # visual thickness of the ramp surface
 const RAMP_SLOT_SPACING := 44.0  # meters between obstacle spawn slots in each section
 const RAMP_MARGIN := 15.0        # clear space kept at the start and end of each section
@@ -173,6 +175,11 @@ const LEVELS := [
 		"name": "THE LIFT AREA",
 		"chunks": 5,
 		"tree": 0.05, "rail": 0.00, "mogul": 0.40, "ramp": 0.12, "bush": 0.00, "rock": 0.00, "pole": 0.45,
+	},
+	{
+		"name": "BIG AIR",
+		"chunks": 5,
+		"tree": 0.00, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.00, "big_ramp": 0.55,
 	},
 ]
 
@@ -352,15 +359,21 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 			root.add_child(_make_rock_cluster(Vector3(rx, 0.0, z)))
 		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0):
 			root.add_child(_make_pole_pair(Vector3(0.0, 0.0, z)))
+		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0) + cfg.get("big_ramp", 0.0):
+			var scale := randf_range(BIG_RAMP_LENGTH_SCALE_MIN, BIG_RAMP_LENGTH_SCALE_MAX)
+			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
+			var ramp_length := randf_range(RAMP_LENGTH_MIN, RAMP_LENGTH_MAX) * scale
+			var ramp_width := (_active_floor_width + WALL_WIDTH * 2.0) * 0.95
+			root.add_child(_make_ramp(Vector3(0.0, 0.0, z), ramp_angle, ramp_length, ramp_width))
 		z -= RAMP_SLOT_SPACING
 
 
-func _make_ramp(origin: Vector3, angle: float, length: float) -> StaticBody3D:
+func _make_ramp(origin: Vector3, angle: float, length: float, width: float = RAMP_WIDTH) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = origin  # y=0, sits on floor
 	body.add_to_group("snow_terrain")
 
-	var w := RAMP_WIDTH
+	var w := width
 	var l := length
 	var h := l * tan(angle)  # peak height at back end
 
