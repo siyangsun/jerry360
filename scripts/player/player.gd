@@ -543,7 +543,7 @@ func _handle_landing() -> void:
 			_trick_had_rail = false
 			_trick_finalize_timer = 0.5
 			var has_flip := int((absf(_air_spin_x) + deg_to_rad(pitch_land_back_max_deg)) / TAU) > 0
-		ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed, has_flip)
+			ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed, has_flip)
 			_air_spin_y = 0.0
 			_air_spin_x = 0.0
 			_air_time = 0.0

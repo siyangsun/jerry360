@@ -79,6 +79,17 @@ var _tutorial_instruction_idx: int = 0
 var _tutorial_instruction_timer: float = 0.0
 var _afternoon_label: Label
 var _afternoon_timer: float = 0.0
+var _close_call_label: Label
+var _close_call_timer: float = 0.0
+var _close_call_wobble_time: float = 0.0
+
+const CLOSE_CALL_DISPLAY_TIME := 2.5
+const CLOSE_CALL_PHRASES := [
+	"close one!",
+	"could almost touch it",
+	"yikes, barely snuck by there",
+	"whoa, that was close",
+]
 
 @export var fun_rate_wow_threshold: float = 20.0
 @export var wow_display_time: float = 3.0
@@ -214,6 +225,7 @@ func _ready() -> void:
 
 	MusicManager.song_changed.connect(_on_song_changed)
 	ScoreManager.combo_changed.connect(_on_combo_changed)
+	ScoreManager.close_call.connect(_on_close_call)
 	GameManager.state_changed.connect(_on_state_changed)
 	GameManager.game_started.connect(_on_game_started)
 	GameManager.wife_calling.connect(_on_wife_calling)
@@ -275,6 +287,22 @@ func _ready() -> void:
 	_afternoon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_afternoon_label.visible = false
 	add_child(_afternoon_label)
+
+	_close_call_label = Label.new()
+	_close_call_label.add_theme_font_size_override("font_size", 22)
+	_close_call_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1))
+	_close_call_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_close_call_label.anchor_left = 0.0
+	_close_call_label.anchor_right = 0.5
+	_close_call_label.anchor_top = 0.5
+	_close_call_label.anchor_bottom = 0.5
+	_close_call_label.offset_left = 18.0
+	_close_call_label.offset_right = 300.0
+	_close_call_label.offset_top = -16.0
+	_close_call_label.offset_bottom = 16.0
+	_close_call_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_close_call_label.visible = false
+	add_child(_close_call_label)
 
 	_player = get_tree().get_first_node_in_group("player")
 	if _player:
@@ -386,6 +414,17 @@ func _process(delta: float) -> void:
 		if _trick_label_timer <= 0.0:
 			_trick_label.visible = false
 
+	if _close_call_label.visible:
+		_close_call_timer -= delta
+		_close_call_wobble_time += delta
+		var wx := sin(_close_call_wobble_time * 29.0) * 4.0
+		var wy := sin(_close_call_wobble_time * 17.0) * 3.0
+		_close_call_label.offset_left = 18.0 + wx
+		_close_call_label.offset_top = -16.0 + wy
+		_close_call_label.offset_bottom = 16.0 + wy
+		if _close_call_timer <= 0.0:
+			_close_call_label.visible = false
+
 	if _wow_label.visible:
 		if _wow_timer > 0.0:
 			_wow_timer -= delta
@@ -463,6 +502,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_woohoo_label.visible = false
 		_wow_label.visible = false
 		_trick_label.visible = false
+		_close_call_label.visible = false
 		_wife_call_active = false
 		_wife_kill_timer = 0.0
 		_wow_timer = 0.0
@@ -819,6 +859,15 @@ func _on_tutorial_complete() -> void:
 	_tutorial_label.visible = false
 	AppearanceManager.unlock_tutorial_board()
 	GameManager.return_to_menu()
+
+
+func _on_close_call() -> void:
+	if GameManager.state != GameManager.State.PLAYING:
+		return
+	_close_call_label.text = CLOSE_CALL_PHRASES[randi() % CLOSE_CALL_PHRASES.size()]
+	_close_call_label.visible = true
+	_close_call_timer = CLOSE_CALL_DISPLAY_TIME
+	_close_call_wobble_time = 0.0
 
 
 func _on_tutorial_board_unlocked() -> void:

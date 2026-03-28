@@ -3,8 +3,13 @@ extends StaticBody3D
 ## Subclass this and override _on_player_hit() for custom behaviour.
 
 signal player_hit
+signal near_miss
 
 @export var kill_player := true
+@export var near_miss_radius := 2.0   # detection sphere radius for close-call scoring (0 = disabled)
+
+var _player_was_hit := false
+var _near_miss_cooldown := 0.0
 
 
 func _ready() -> void:
@@ -13,9 +18,40 @@ func _ready() -> void:
 	if area:
 		area.body_entered.connect(_on_body_entered)
 
+	# Auto-create proximity zone for close-call detection
+	if near_miss_radius > 0.0:
+		var prox := Area3D.new()
+		prox.name = "NearMissArea"
+		var shape := CollisionShape3D.new()
+		var sphere := SphereShape3D.new()
+		sphere.radius = near_miss_radius
+		shape.shape = sphere
+		prox.add_child(shape)
+		add_child(prox)
+		prox.body_entered.connect(_on_near_miss_entered)
+		prox.body_exited.connect(_on_near_miss_exited)
+
+
+func _process(delta: float) -> void:
+	if _near_miss_cooldown > 0.0:
+		_near_miss_cooldown -= delta
+
+
+func _on_near_miss_entered(body: Node3D) -> void:
+	if body.is_in_group("player"):
+		_player_was_hit = false
+
+
+func _on_near_miss_exited(body: Node3D) -> void:
+	if body.is_in_group("player") and not _player_was_hit and _near_miss_cooldown <= 0.0:
+		_near_miss_cooldown = 2.0
+		near_miss.emit()
+		ScoreManager.add_close_call()
+
 
 func _on_body_entered(body: Node3D) -> void:
 	if body.is_in_group("player"):
+		_player_was_hit = true
 		player_hit.emit()
 		_on_player_hit(body)
 

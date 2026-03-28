@@ -606,6 +606,31 @@ func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
 	return mesh
 
 
+# Connects crash detection to hit_area and adds a proximity sphere for close-call scoring.
+func _attach_near_miss(root: Node3D, hit_area: Area3D, near_radius: float, near_y: float) -> void:
+	var hit := [false]
+	hit_area.body_entered.connect(func(body: Node3D) -> void:
+		if body.has_method("crash"):
+			hit[0] = true
+			body.crash()
+	)
+	var near := Area3D.new()
+	var col := CollisionShape3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = near_radius
+	col.shape = sphere
+	col.position.y = near_y
+	near.add_child(col)
+	near.collision_mask = 1  # player only
+	near.body_entered.connect(func(body: Node3D) -> void:
+		if body.is_in_group("player"): hit[0] = false
+	)
+	near.body_exited.connect(func(body: Node3D) -> void:
+		if body.is_in_group("player") and not hit[0]: ScoreManager.add_close_call()
+	)
+	root.add_child(near)
+
+
 func _make_tree_cluster(center: Vector3) -> Node3D:
 	var cluster := Node3D.new()
 	cluster.position = center
@@ -660,10 +685,7 @@ func _make_tree(pos: Vector3) -> Node3D:
 	area_col.position.y = (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5
 	area.add_child(area_col)
 	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	area.body_entered.connect(func(body: Node3D) -> void:
-		if body.has_method("crash"):
-			body.crash()
-	)
+	_attach_near_miss(root, area, 2.0, (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5)
 	root.add_child(area)
 
 	return root
@@ -700,10 +722,7 @@ func _make_bush(pos: Vector3) -> Node3D:
 	area_col.position.y = BUSH_HEIGHT * 0.5
 	area.add_child(area_col)
 	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	area.body_entered.connect(func(body: Node3D) -> void:
-		if body.has_method("crash"):
-			body.crash()
-	)
+	_attach_near_miss(root, area, 2.2, BUSH_HEIGHT * 0.5)
 	root.add_child(area)
 
 	return root
@@ -825,10 +844,7 @@ func _make_rock_crystal(pos: Vector3) -> Node3D:
 	area_col.position.y = (body_h + cap_h) * 0.5 - ROCK_SINK
 	area.add_child(area_col)
 	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	area.body_entered.connect(func(body: Node3D) -> void:
-		if body.has_method("crash"):
-			body.crash()
-	)
+	_attach_near_miss(root, area, radius + 1.5, (body_h + cap_h) * 0.5 - ROCK_SINK)
 	root.add_child(area)
 
 	return root
@@ -879,10 +895,7 @@ func _make_pole(pos: Vector3) -> Node3D:
 	area_col.position.y = 1.0 - POLE_SINK
 	area.add_child(area_col)
 	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	area.body_entered.connect(func(body: Node3D) -> void:
-		if body.has_method("crash"):
-			body.crash()
-	)
+	_attach_near_miss(root, area, 1.8, 1.0 - POLE_SINK)
 	root.add_child(area)
 
 	return root

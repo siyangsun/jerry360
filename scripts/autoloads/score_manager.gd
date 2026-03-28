@@ -21,12 +21,14 @@ const COMBO_MAX_MULTIPLIER := 4.0   # highest possible score multiplier, no matt
 @export var fun_carve_rate_bonus: float = 0.5   # max additional fun rate when fully carving (added on top)
 @export var fun_goofy_mult: float = 1.5         # fun rate multiplier when riding goofy
 @export var fun_flip_mult: float = 3.0          # fun multiplier for tricks that include a front/backflip
+@export var fun_close_call: float = 15.0        # fun awarded for a close call with an obstacle
 
 signal distance_updated(dist: float)
 signal new_high_score(dist: float)
 signal combo_changed(count: int, multiplier: float)
 signal trick_landed(is_stomp: bool)
 signal fun_updated(fun: float)
+signal close_call
 
 
 func _ready() -> void:
@@ -81,6 +83,14 @@ func add_trick(is_stomp: bool) -> void:
 	combo_multiplier = minf(1.0 + combo_count * COMBO_MULT_PER_COUNT, COMBO_MAX_MULTIPLIER)
 	combo_changed.emit(combo_count, combo_multiplier)
 	trick_landed.emit(is_stomp)
+
+
+func add_close_call() -> void:
+	if GameManager.state != GameManager.State.PLAYING or GameManager.current_speed < 30.0:
+		return
+	fun += fun_close_call * combo_multiplier
+	fun_updated.emit(fun)
+	close_call.emit()
 
 
 func reset_combo() -> void:
