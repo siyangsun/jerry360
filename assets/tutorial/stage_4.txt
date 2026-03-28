@@ -1,6 +1,7 @@
-jump with the space bar; hit a ramp to get more air
-you can charge up a bigger jump with the down arrow
-try to land flat, and/or hold S before landing to stabilize and avoid wiping out
+jump with space — hold it to charge, release to launch higher
+hit a ramp to send it even further
+use up/down arrows in the air for front and backflips — worth 3x a spin!
+use left/right arrows in the air to spin — land within 180° of straight to score
+hold S before landing to widen your safe landing angle and avoid wiping out
 grind rails by riding onto the approach ramp
-spin with A or D while in the air to pull tricks
-land straight to score and build your combo
+clean landings build your combo multiplier and boost your speed

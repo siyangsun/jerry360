@@ -27,11 +27,14 @@ const BOARD_COLORS: Array[Color] = [
 const CONTROLS_DATA: Array[Dictionary] = [
 	{"key": "Left / Right",        "desc": "Steer the board left and right"},
 	{"key": "A / D",               "desc": "Lean — shifts weight sideways and carves"},
-	{"key": "Space / Up",          "desc": "Jump"},
-	{"key": "Down (hold)",         "desc": "Charge a jump — release to launch higher"},
+	{"key": "Space",               "desc": "Jump — hold to charge, release to launch higher"},
 	{"key": "W  (hold)",           "desc": "Lean forward — accelerate past top speed"},
-	{"key": "S  (hold)",           "desc": "Lean back — brake on the ground, or prep for landing"},
-	{"key": "Left / Right (air)",  "desc": "Spin tricks — land straight to score and boost"},
+	{"key": "S  (hold)",           "desc": "Lean back — brake on the ground, or hold before landing to widen your safe landing angle"},
+	{"key": "Left / Right (air)",  "desc": "Spin — land within 180° of straight to score and boost speed"},
+	{"key": "Up / Down (air)",     "desc": "Front / backflip — land upright to score (worth 3× a spin)"},
+	{"key": "Lean + Turn",         "desc": "Always lean and turn the same direction — opposing inputs will cause a wipeout"},
+	{"key": "Scoring",             "desc": "Distance × speed × combo multiplier — clean trick landings grow your combo; sloppy ones cost speed"},
+	{"key": "Close calls",         "desc": "Narrowly dodge an obstacle above 30 m/s for bonus fun"},
 	{"key": "Esc",                 "desc": "Pause"},
 ]
 
