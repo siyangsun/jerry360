@@ -187,7 +187,7 @@ const LEVELS := [
 	{
 		"name": "BIG AIR",
 		"chunks": 5,
-		"tree": 0.00, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.00, "big_ramp": 0.55, "sign": 0.20,
+		"tree": 0.00, "rail": 0.00, "mogul": 0.00, "ramp": 0.00, "bush": 0.00, "rock": 0.00, "big_ramp": 0.42, "sign": 0.20,
 	},
 ]
 
