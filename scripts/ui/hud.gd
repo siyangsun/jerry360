@@ -524,7 +524,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		var combo_str := ("best combo x%d" % top_combo) if top_combo > 1 else "no combos"
 		var first_line: String
 		if GameManager.wife_killed_jerry:
-			first_line = "wasn't stoked enough i guess.\nshould probably get on linkedin"
+			first_line = "not really feeling it today.\nsoup sounds good actually..."
 		elif _is_goofy:
 			first_line = "Got a little too goofy."
 		else:

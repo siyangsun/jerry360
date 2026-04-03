@@ -16,6 +16,10 @@ config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"
 config/run/main_scene="res://scenes/main.tscn"
 
+[audio]
+
+driver/output_latency=30
+
 [autoload]
 
 GameManager="*res://scripts/autoloads/game_manager.gd"
@@ -94,3 +98,5 @@ pitch_back={
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+lights_and_shadows/directional_shadow/size=1024
+lights_and_shadows/directional_shadow/size.mobile=1024

@@ -5,8 +5,10 @@ signal song_changed(song_name: String)
 var _menu_player: AudioStreamPlayer
 var _game_player: AudioStreamPlayer
 var _death_player: AudioStreamPlayer
+var _wife_death_player: AudioStreamPlayer
 
 const TUTORIAL_SONG := "res://assets/audio/music/figuring it out.mp3"
+const WIFE_DEATH_SONG := "res://assets/audio/music/i miss my wife.mp3"
 
 const GAMEPLAY_SONGS: Array[String] = [
 	"res://assets/audio/music/KRAZYKRAZY.mp3",
@@ -17,7 +19,6 @@ const GAMEPLAY_SONGS: Array[String] = [
 	"res://assets/audio/music/heel hook.mp3",
 	"res://assets/audio/music/laguna liability.mp3",
 	"res://assets/audio/music/earnings per share.mp3",
-	"res://assets/audio/music/i miss my wife.mp3",
 ]
 
 const VOLUME_DB := -3.1
@@ -45,6 +46,13 @@ func _ready() -> void:
 	_death_player.volume_db = VOLUME_DB
 	add_child(_death_player)
 
+	var wife_death_stream := load(WIFE_DEATH_SONG) as AudioStreamMP3
+	wife_death_stream.loop = true
+	_wife_death_player = AudioStreamPlayer.new()
+	_wife_death_player.stream = wife_death_stream
+	_wife_death_player.volume_db = VOLUME_DB
+	add_child(_wife_death_player)
+
 	GameManager.state_changed.connect(_on_state_changed)
 	_on_state_changed(GameManager.state)
 
@@ -64,9 +72,12 @@ func _play_random_gameplay_song() -> void:
 func _on_state_changed(new_state: GameManager.State) -> void:
 	match new_state:
 		GameManager.State.MENU:
-			_switch_to(_menu_player, [_game_player, _death_player])
+			_switch_to(_menu_player, [_game_player, _death_player, _wife_death_player])
 		GameManager.State.DEAD:
-			_switch_to(_death_player, [_menu_player, _game_player])
+			if GameManager.wife_killed_jerry:
+				_switch_to(_wife_death_player, [_menu_player, _game_player, _death_player])
+			else:
+				_switch_to(_death_player, [_menu_player, _game_player, _wife_death_player])
 		GameManager.State.PLAYING:
 			if not _game_player.playing:
 				if GameManager.is_tutorial:
@@ -75,6 +86,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 					_play_random_gameplay_song()
 			_menu_player.stop()
 			_death_player.stop()
+			_wife_death_player.stop()
 		GameManager.State.PAUSED:
 			pass  # keep whatever is playing
 
