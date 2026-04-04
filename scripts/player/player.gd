@@ -89,6 +89,7 @@ signal stance_changed(goofy: bool)
 signal wipeout_danger(intensity: float, reason: WipeoutReason)
 signal nice_air(air_time: float)
 signal trick_named(trick: String)
+signal wipeout_getting_up
 
 var is_goofy: bool = false
 var _is_dead: bool = false
@@ -99,6 +100,7 @@ var _air_time: float = 0.0
 var _nice_air_shown: bool = false
 var _is_wiping_out: bool = false
 var _wipeout_timer: float = 0.0
+var _wipeout_phase3_triggered: bool = false
 var _rail_spin_acc: float = 0.0
 var _rail_tricks: int = 0
 var _was_on_rail: bool = false
@@ -628,6 +630,7 @@ func _handle_lean_back(delta: float) -> void:
 func _start_wipeout() -> void:
 	_is_wiping_out = true
 	_wipeout_timer = wipeout_duration
+	_wipeout_phase3_triggered = false
 	_yaw_recovery = false
 	_boost_multiplier = 1.0
 	_boost_timer = 0.0
@@ -676,6 +679,9 @@ func _handle_wipeout(delta: float) -> void:
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, -PI / 2.0, 5.0 * delta)
 			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
 		else:
+			if not _wipeout_phase3_triggered:
+				_wipeout_phase3_triggered = true
+				wipeout_getting_up.emit()
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, 0.0, 5.0 * delta)
 			mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, 0.0, 5.0 * delta)
 			mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, 0.0, 5.0 * delta)
@@ -844,6 +850,7 @@ func _on_game_started() -> void:
 	_air_time = 0.0
 	_is_wiping_out = false
 	_wipeout_timer = 0.0
+	_wipeout_phase3_triggered = false
 	_rail_spin_acc = 0.0
 	_rail_tricks = 0
 	_was_on_rail = false

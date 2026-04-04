@@ -35,6 +35,7 @@ var _crash_timer: float = 0.0
 var _crash_speed: float = 0.0  # rider's own speed during the crash deceleration
 
 var _mesh_pivot: Node3D
+var _you_good_label: Label3D = null
 
 
 func _ready() -> void:
@@ -49,6 +50,7 @@ func _ready() -> void:
 	# Read wipeout vars from Jerry so any Inspector tweaks on the player propagate here too
 	var player := get_tree().get_first_node_in_group("player")
 	if player:
+		player.wipeout_getting_up.connect(_on_jerry_getting_up)
 		_wipeout_duration      = player.wipeout_duration
 		_wipeout_brake_rate    = player.wipeout_brake_rate
 		_wipeout_lateral_decel = player.wipeout_lateral_decel
@@ -171,6 +173,29 @@ func _build_visuals(color: Color) -> void:
 	board_mesh.mesh = board_box
 	board_mesh.position.y = 0.04
 	_mesh_pivot.add_child(board_mesh)
+
+
+func _on_jerry_getting_up() -> void:
+	var player := get_tree().get_first_node_in_group("player")
+	if not player:
+		return
+	if global_position.distance_to(player.global_position) > 15.0:
+		return
+	if is_instance_valid(_you_good_label):
+		return
+	_you_good_label = Label3D.new()
+	_you_good_label.text = "you good?"
+	_you_good_label.font_size = 32
+	_you_good_label.modulate = Color(1.0, 1.0, 1.0, 0.9)
+	_you_good_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_you_good_label.no_depth_test = true
+	_you_good_label.pixel_size = 0.008
+	_you_good_label.position = Vector3(0.0, 2.0, 0.0)
+	add_child(_you_good_label)
+	var tween := create_tween()
+	tween.tween_interval(2.0)
+	tween.tween_property(_you_good_label, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(_you_good_label.queue_free)
 
 
 func _build_collision() -> void:
