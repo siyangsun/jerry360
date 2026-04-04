@@ -62,6 +62,10 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var lean_boost_decay := 15.0          # how fast Jerry slows back to normal after releasing lean forward
 @export var min_trick_air_time := 0.3         # minimum time in the air before a spin counts as a trick (seconds)
 @export var min_trick_spin := 0.8             # minimum spin to count as a trick (roughly half a rotation)
+@export var grab_threshold := 2.5            # lean speed (m/s) needed to attempt a grab
+@export var grab_hold_time := 0.3            # seconds lean must be held past grab_threshold to earn a grab
+@export var shifty_threshold_deg := 45.0     # yaw excursion (degrees) needed for a shifty
+@export var buck_threshold_deg := 45.0       # pitch excursion (degrees) needed for a nose/tail buck
 @export var air_pitch_speed := TAU * 0.78     # pitch rotation speed in air (rad/s) — max speed at full acceleration
 @export var air_pitch_accel := TAU * 1.8     # how fast pitch speed ramps up when holding flip input (rad/s²)
 @export var pitch_land_back_max_deg := 45.0   # max backward pitch at landing (deg) to avoid wipeout
@@ -101,6 +105,10 @@ var _nice_air_shown: bool = false
 var _is_wiping_out: bool = false
 var _wipeout_timer: float = 0.0
 var _wipeout_phase3_triggered: bool = false
+var _grab_timer: float = 0.0
+var _grab_earned: int = 0        # +1 = frontside, -1 = backside, 0 = none this air
+var _air_yaw_peak: float = 0.0   # signed peak yaw excursion this air
+var _air_pitch_peak: float = 0.0 # signed peak pitch excursion this air
 var _rail_spin_acc: float = 0.0
 var _rail_tricks: int = 0
 var _was_on_rail: bool = false
@@ -126,6 +134,9 @@ var _pending_trick_spin: float = 0.0
 var _pending_trick_spin_x: float = 0.0
 var _pending_trick_air_time: float = 0.0
 var _pending_had_rail: bool = false
+var _pending_grab: int = 0
+var _pending_yaw_peak: float = 0.0
+var _pending_pitch_peak: float = 0.0
 
 var _air_pitch_vel: float = 0.0  # current pitch angular velocity, accelerates when holding flip input
 var _board_yaw: float = 0.0    # board facing angle offset from world forward (rad, + = right)
@@ -471,6 +482,21 @@ func _handle_air_spin(delta: float) -> void:
 		var stance_offset := PI if is_goofy else 0.0
 		mesh_pivot.rotation.y = lerpf(mesh_pivot.rotation.y, stance_offset + _air_spin_y, air_spin_lerp_speed * delta)
 
+	# Grab: hold a tilt past threshold long enough to earn it
+	if not on_rail and not is_on_floor():
+		if absf(_lean_vel_x) >= grab_threshold:
+			_grab_timer += delta
+			if _grab_earned == 0 and _grab_timer >= grab_hold_time:
+				_grab_earned = 1 if _lean_vel_x > 0.0 else -1
+		else:
+			_grab_timer = 0.0
+
+	# Peak excursion tracking for shifty and buck
+	if absf(_air_spin_y) > absf(_air_yaw_peak):
+		_air_yaw_peak = _air_spin_y
+	if absf(_air_spin_x) > absf(_air_pitch_peak):
+		_air_pitch_peak = _air_spin_x
+
 
 func _handle_landing() -> void:
 	var on_floor := is_on_floor()
@@ -546,12 +572,33 @@ func _handle_landing() -> void:
 			_trick_finalize_timer = 0.5
 			var has_flip := int((absf(_air_spin_x) + deg_to_rad(pitch_land_back_max_deg)) / TAU) > 0
 			ScoreManager.add_fun_airtime(_air_time, GameManager.current_speed, has_flip)
+			var _has_yaw_spin := absf(_air_spin_y) >= min_trick_spin
+			var _flip_count := int((absf(_air_spin_x) + deg_to_rad(pitch_land_back_max_deg)) / TAU)
+			if _grab_earned != 0:
+				ScoreManager.add_trick(true)
+			var _shifty_ok := not _has_yaw_spin and absf(_air_yaw_peak) >= deg_to_rad(shifty_threshold_deg)
+			if _shifty_ok:
+				ScoreManager.add_trick(true)
+			var _buck_ok := _flip_count == 0 and absf(_air_pitch_peak) >= deg_to_rad(buck_threshold_deg)
+			if _buck_ok:
+				ScoreManager.add_trick(true)
+			_pending_grab = _grab_earned
+			_pending_yaw_peak = _air_yaw_peak if _shifty_ok else 0.0
+			_pending_pitch_peak = _air_pitch_peak if _buck_ok else 0.0
+			_grab_timer = 0.0
+			_grab_earned = 0
+			_air_yaw_peak = 0.0
+			_air_pitch_peak = 0.0
 			_air_spin_y = 0.0
 			_air_spin_x = 0.0
 			_air_time = 0.0
 	elif not on_floor and _was_on_floor:
 		SfxManager.play_airborne()
 		_nice_air_shown = false
+		_grab_timer = 0.0
+		_grab_earned = 0
+		_air_yaw_peak = 0.0
+		_air_pitch_peak = 0.0
 	_was_on_floor = on_floor
 
 
@@ -657,6 +704,13 @@ func _start_wipeout() -> void:
 	_pending_trick_spin_x = 0.0
 	_pending_trick_air_time = 0.0
 	_pending_had_rail = false
+	_pending_grab = 0
+	_pending_yaw_peak = 0.0
+	_pending_pitch_peak = 0.0
+	_grab_timer = 0.0
+	_grab_earned = 0
+	_air_yaw_peak = 0.0
+	_air_pitch_peak = 0.0
 	_air_spin_x = 0.0
 	_air_pitch_vel = 0.0
 
@@ -713,32 +767,43 @@ func _tick_trick_finalize(delta: float) -> void:
 	_trick_finalize_timer -= delta
 	if _trick_finalize_timer <= 0.0:
 		_trick_finalize_timer = 0.0
-		var trick := _get_trick_name(_pending_trick_spin, _pending_trick_spin_x, _pending_trick_air_time)
+		var trick := _get_trick_name(_pending_trick_spin, _pending_trick_spin_x, _pending_trick_air_time, _pending_grab, _pending_yaw_peak, _pending_pitch_peak)
 		if trick != "":
 			if _pending_had_rail:
 				trick = "Rail Grind " + trick
 			trick_named.emit(trick)
 		_pending_had_rail = false
+		_pending_grab = 0
+		_pending_yaw_peak = 0.0
+		_pending_pitch_peak = 0.0
 
 
-func _get_trick_name(spin_y: float, spin_x: float, air_time: float) -> String:
+func _get_trick_name(spin_y: float, spin_x: float, air_time: float, grab: int, yaw_peak: float, pitch_peak: float) -> String:
 	if air_time < min_trick_air_time:
 		return ""
 	var has_yaw := absf(spin_y) >= min_trick_spin
 	var flip_count := int((absf(spin_x) + deg_to_rad(pitch_land_back_max_deg)) / TAU)
-	if not has_yaw and flip_count == 0:
+	var has_grab := grab != 0
+	var has_shifty := yaw_peak != 0.0
+	var has_buck := pitch_peak != 0.0
+	if not has_yaw and flip_count == 0 and not has_grab and not has_shifty and not has_buck:
 		return "Straight Air" if air_time >= big_air_time else ""
-	var name := ""
+	var parts: Array[String] = []
 	if flip_count > 0:
 		var flip_dir := "Back" if spin_x > 0.0 else "Front"
-		name = "%sflip" % flip_dir if flip_count == 1 else "%d° %sflip" % [flip_count * 360, flip_dir]
+		parts.append("%sflip" % flip_dir if flip_count == 1 else "%d° %sflip" % [flip_count * 360, flip_dir])
 	if has_yaw:
 		var n := int(maxf(1.0, roundf(absf(spin_y) / PI)))
 		var degrees := n * 180
 		var direction := "Frontside" if spin_y > 0.0 else "Backside"
-		var yaw_part := "%s %d" % [direction, degrees]
-		name = (name + " + " + yaw_part) if name != "" else yaw_part
-	return name
+		parts.append("%s %d" % [direction, degrees])
+	if has_grab:
+		parts.append("%s Grab" % ("Frontside" if grab > 0 else "Backside"))
+	if has_shifty:
+		parts.append("%s Shifty" % ("Frontside" if yaw_peak > 0.0 else "Backside"))
+	if has_buck:
+		parts.append("%s Buck" % ("Tail" if pitch_peak > 0.0 else "Nose"))
+	return " + ".join(parts)
 
 
 func _is_on_rail() -> bool:
@@ -839,6 +904,13 @@ func _on_game_started() -> void:
 	_pending_trick_spin_x = 0.0
 	_pending_trick_air_time = 0.0
 	_pending_had_rail = false
+	_pending_grab = 0
+	_pending_yaw_peak = 0.0
+	_pending_pitch_peak = 0.0
+	_grab_timer = 0.0
+	_grab_earned = 0
+	_air_yaw_peak = 0.0
+	_air_pitch_peak = 0.0
 	_air_spin_x = 0.0
 	_air_pitch_vel = 0.0
 	_is_dead = false
