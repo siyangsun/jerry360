@@ -56,6 +56,8 @@ var _nice_air_label: Label
 var _nice_air_time: float = 0.0
 var _trick_label: Label
 var _trick_label_timer: float = 0.0
+var _trick_jiggle_time: float = 0.0
+var _fun_had_label: Label
 var _player: Node
 var _level_label: Label
 var _skip_btn: Button
@@ -125,9 +127,11 @@ func _ready() -> void:
 	_goofy_label.visible = false
 	_goofy_label.add_theme_font_size_override("font_size", 64)
 	_goofy_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_goofy_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_goofy_label.offset_left = -400.0
+	_goofy_label.offset_right = 400.0
+	_goofy_label.offset_top = 60.0
+	_goofy_label.offset_bottom = 140.0
 	_goofy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_goofy_label.position.y = 12.0
 	_goofy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_goofy_label)
 
@@ -147,16 +151,16 @@ func _ready() -> void:
 
 	_now_playing_label = Label.new()
 	_now_playing_label.text = "now playing\n"
-	_now_playing_label.add_theme_font_size_override("font_size", 11)
+	_now_playing_label.add_theme_font_size_override("font_size", 17)
 	_now_playing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_now_playing_label.anchor_left = 1.0
 	_now_playing_label.anchor_right = 1.0
 	_now_playing_label.anchor_top = 0.0
 	_now_playing_label.anchor_bottom = 0.0
 	_now_playing_label.offset_right = -8.0
-	_now_playing_label.offset_left = -140.0
+	_now_playing_label.offset_left = -206.0
 	_now_playing_label.offset_top = 8.0
-	_now_playing_label.offset_bottom = 36.0
+	_now_playing_label.offset_bottom = 50.0
 	_now_playing_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	_now_playing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_now_playing_label.visible = false
@@ -164,15 +168,15 @@ func _ready() -> void:
 
 	_skip_btn = Button.new()
 	_skip_btn.text = ">> skip"
-	_skip_btn.add_theme_font_size_override("font_size", 14)
+	_skip_btn.add_theme_font_size_override("font_size", 21)
 	_skip_btn.anchor_left = 1.0
 	_skip_btn.anchor_right = 1.0
 	_skip_btn.anchor_top = 0.0
 	_skip_btn.anchor_bottom = 0.0
 	_skip_btn.offset_right = -8.0
-	_skip_btn.offset_left = -80.0
-	_skip_btn.offset_top = 38.0
-	_skip_btn.offset_bottom = 60.0
+	_skip_btn.offset_left = -116.0
+	_skip_btn.offset_top = 62.0
+	_skip_btn.offset_bottom = 95.0
 	_skip_btn.flat = true
 	_skip_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.65))
 	_skip_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1.0))
@@ -255,15 +259,42 @@ func _ready() -> void:
 	_trick_label.anchor_right = 1.0
 	_trick_label.anchor_top = 1.0
 	_trick_label.anchor_bottom = 1.0
-	_trick_label.offset_left = -280.0
+	_trick_label.offset_left = -347.0
 	_trick_label.offset_right = -12.0
-	_trick_label.offset_top = -52.0
-	_trick_label.offset_bottom = -12.0
-	_trick_label.add_theme_font_size_override("font_size", 22)
+	_trick_label.offset_top = -105.0
+	_trick_label.offset_bottom = -55.0
+	_trick_label.add_theme_font_size_override("font_size", 28)
 	_trick_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
+	var trick_base_font := SystemFont.new()
+	trick_base_font.font_names = PackedStringArray(["Georgia", "Times New Roman", "serif"])
+	trick_base_font.font_italic = true
+	var trick_font := FontVariation.new()
+	trick_font.base_font = trick_base_font
+	_trick_label.add_theme_font_override("font", trick_font)
 	_trick_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_trick_label.visible = false
 	add_child(_trick_label)
+
+	_fun_had_label = Label.new()
+	_fun_had_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_fun_had_label.anchor_left = 1.0
+	_fun_had_label.anchor_right = 1.0
+	_fun_had_label.anchor_top = 1.0
+	_fun_had_label.anchor_bottom = 1.0
+	_fun_had_label.offset_left = -347.0
+	_fun_had_label.offset_right = -12.0
+	_fun_had_label.offset_top = -50.0
+	_fun_had_label.offset_bottom = -12.0
+	_fun_had_label.add_theme_font_size_override("font_size", 18)
+	_fun_had_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
+	var fun_had_base_font := SystemFont.new()
+	fun_had_base_font.font_names = PackedStringArray(["Consolas", "Courier New", "monospace"])
+	var fun_had_font := FontVariation.new()
+	fun_had_font.base_font = fun_had_base_font
+	_fun_had_label.add_theme_font_override("font", fun_had_font)
+	_fun_had_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fun_had_label.visible = false
+	add_child(_fun_had_label)
 
 	_tutorial_label = Label.new()
 	_tutorial_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
@@ -388,8 +419,11 @@ func _connect_level_generator() -> void:
 func _process(delta: float) -> void:
 	if _goofy_label.visible:
 		_goofy_time += delta
-		_goofy_label.position.x = sin(_goofy_time * 27.0) * 6.0
-		_goofy_label.position.y = sin(_goofy_time * 19.0) * 4.0
+		var _goofy_wx := sin(_goofy_time * 27.0) * 6.0
+		var _goofy_wy := sin(_goofy_time * 19.0) * 4.0
+		_goofy_label.offset_left = -400.0 + _goofy_wx
+		_goofy_label.offset_right = 400.0 + _goofy_wx
+		_goofy_label.offset_top = 60.0 + _goofy_wy
 
 	if _nice_air_label.visible:
 		_nice_air_time += delta
@@ -447,7 +481,8 @@ func _process(delta: float) -> void:
 		var best_str := "--:--"
 		if _best_lap < INF:
 			best_str = "%d:%02d" % [int(_best_lap) / 60, int(_best_lap) % 60]
-		distance_label.text = "%.0f m\n%.0f m/s\n%d:%02d\nBest %s\nfun had: %.0f" % [ScoreManager.distance, GameManager.current_speed, mins, secs, best_str, ScoreManager.fun]
+		distance_label.text = "%.0f m\n%.0f m/s\n%d:%02d\nBest %s" % [ScoreManager.distance, GameManager.current_speed, mins, secs, best_str]
+		_fun_had_label.text = "fun had: %.0f" % ScoreManager.fun
 
 		if _wow_timer <= 0.0 and ScoreManager.fun_rate > fun_rate_wow_threshold:
 			_wow_timer = wow_display_time
@@ -496,6 +531,7 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	_level_label.visible = new_state == GameManager.State.PLAYING
 	_skip_btn.visible = new_state == GameManager.State.PLAYING
 	_now_playing_label.visible = new_state == GameManager.State.PLAYING
+	_fun_had_label.visible = new_state == GameManager.State.PLAYING
 	if new_state != GameManager.State.PLAYING:
 		_combo_label.visible = false
 		_goofy_label.visible = false
@@ -805,6 +841,7 @@ func _on_trick_named(trick: String) -> void:
 	_trick_label.text = trick
 	_trick_label.visible = true
 	_trick_label_timer = 2.5
+	_trick_jiggle_time = 0.0
 
 
 func _on_song_changed(song_name: String) -> void:
