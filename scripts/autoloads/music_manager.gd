@@ -19,6 +19,7 @@ const GAMEPLAY_SONGS: Array[String] = [
 	"res://assets/audio/music/heel hook.mp3",
 	"res://assets/audio/music/laguna liability.mp3",
 	"res://assets/audio/music/earnings per share.mp3",
+	"res://assets/audio/music/can't see shit.mp3",
 ]
 
 const VOLUME_DB := -3.1
@@ -27,7 +28,7 @@ var _song_queue: Array[String] = []
 
 
 func _ready() -> void:
-	var menu_stream := load("res://assets/audio/music/purplepinkcannon - menu.mp3") as AudioStreamMP3
+	var menu_stream := load("res://assets/audio/music/menu.mp3") as AudioStreamMP3
 	menu_stream.loop = true
 	_menu_player = AudioStreamPlayer.new()
 	_menu_player.stream = menu_stream
