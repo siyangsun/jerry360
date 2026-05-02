@@ -684,7 +684,10 @@ func _attach_near_miss(root: Node3D, hit_area: Area3D, near_radius: float, near_
 		if body.is_in_group("player"): hit[0] = false
 	)
 	near.body_exited.connect(func(body: Node3D) -> void:
-		if body.is_in_group("player") and not hit[0]: ScoreManager.add_close_call()
+		if body.is_in_group("player"):
+			(func():
+				if not hit[0]: ScoreManager.add_close_call()
+			).call_deferred()
 	)
 	root.add_child(near)
 

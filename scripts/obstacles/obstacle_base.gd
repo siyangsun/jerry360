@@ -43,10 +43,13 @@ func _on_near_miss_entered(body: Node3D) -> void:
 
 
 func _on_near_miss_exited(body: Node3D) -> void:
-	if body.is_in_group("player") and not _player_was_hit and _near_miss_cooldown <= 0.0:
+	if body.is_in_group("player") and _near_miss_cooldown <= 0.0:
 		_near_miss_cooldown = 2.0
-		near_miss.emit()
-		ScoreManager.add_close_call()
+		(func():
+			if not _player_was_hit:
+				near_miss.emit()
+				ScoreManager.add_close_call()
+		).call_deferred()
 
 
 func _on_body_entered(body: Node3D) -> void:
