@@ -3,7 +3,6 @@
 [ext_resource type="Shader" path="res://assets/shaders/lateral_fog.gdshader" id="1_latfog"]
 [ext_resource type="Shader" path="res://assets/shaders/player_fog.gdshader" id="1_playerfog"]
 [ext_resource type="Script" path="res://scripts/world/player_fog.gd" id="1_playerfogscript"]
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/world/level_generator.gd" id="2_levelgen"]
 [ext_resource type="Script" path="res://scripts/world/camera_rig.gd" id="3_camrig"]
 [ext_resource type="Script" path="res://scripts/world/rider_manager.gd" id="8_ridermgr"]
@@ -62,7 +61,6 @@ volumetric_fog_albedo = Color(0.85, 0.92, 1.0, 1)
 volumetric_fog_length = 128.0
 
 [node name="Main" type="Node3D"]
-script = ExtResource("1_main")
 
 [node name="SubViewportContainer" type="SubViewportContainer" parent="."]
 anchor_right = 1.0

@@ -629,14 +629,6 @@ func _fall_off() -> void:
 	GameManager.player_died()
 
 
-func die() -> void:
-	if _is_dead:
-		return
-	_is_dead = true
-	velocity = Vector3.ZERO
-	GameManager.player_died()
-
-
 func _handle_lean_forward(delta: float) -> void:
 	if not _is_leaning_fwd or _is_on_rail():
 		return

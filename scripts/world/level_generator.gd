@@ -116,7 +116,6 @@ const RAIL_RAMP_GAP := 0.1         # small gap between the ramp top and the flat
 # ── Level configs ─────────────────────────────────────────────────────────────
 # Each level: name, chunks before advancing, and obstacle spawn weights.
 # Weights are evaluated in order (tree → rail → mogul → ramp); remaining roll = empty slot.
-const EMPTY_LEVEL := { "tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0 }
 
 # ── Tutorial configs ───────────────────────────────────────────────────────────
 # Five hardcoded stages played in order. Each has a variant key (drives tilt + speed)
