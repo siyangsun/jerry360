@@ -75,15 +75,16 @@ func _on_level_changed(level_name: String, _level_number: int) -> void:
 
 
 func _on_game_started() -> void:
-	for rider in get_tree().get_nodes_in_group("ai_rider"):
-		rider.queue_free()
-	_is_main_run = false
-	_spawn_timer = 0.0
+	_reset()
 
 
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state != GameManager.State.PLAYING:
-		for rider in get_tree().get_nodes_in_group("ai_rider"):
-			rider.queue_free()
-		_is_main_run = false
-		_spawn_timer = 0.0
+		_reset()
+
+
+func _reset() -> void:
+	for rider in get_tree().get_nodes_in_group("ai_rider"):
+		rider.queue_free()
+	_is_main_run = false
+	_spawn_timer = 0.0

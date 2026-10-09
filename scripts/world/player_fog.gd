@@ -1,7 +1,5 @@
 extends FogVolume
 
-const LevelGenerator = preload("res://scripts/world/level_generator.gd")
-
 const CLEAR_FOG_RADIUS        := 15000.0  # clear bubble radius during clear runs (effectively no fog)
 const CLEAR_FOG_FALLOFF       := 0.02     # fog density per unit during clear runs
 const NORMAL_FOG_RADIUS       := 11.0     # clear bubble radius during normal runs (light fog in distance)
@@ -77,14 +75,9 @@ func _on_variant_changed(variant: String) -> void:
 
 	var log_r0 := log(from_radius);   var log_r1 := log(target_radius)
 	var log_f0 := log(from_falloff);  var log_f1 := log(target_falloff)
-	if _tween:
-		_tween.kill()
-	_tween = create_tween()
-	_tween.tween_method(
-		func(t: float) -> void:
-			mat.set_shader_parameter("fog_radius",  exp(lerp(log_r0, log_r1, t)))
-			mat.set_shader_parameter("fog_falloff", exp(lerp(log_f0, log_f1, t))),
-		0.0, 1.0, FOG_TRANSITION_DURATION
+	_tween_fog(func(t: float) -> void:
+		mat.set_shader_parameter("fog_radius",  exp(lerp(log_r0, log_r1, t)))
+		mat.set_shader_parameter("fog_falloff", exp(lerp(log_f0, log_f1, t)))
 	)
 
 
@@ -99,11 +92,13 @@ func _compat_variant_changed(variant: String) -> void:
 	else:
 		target_density = COMPAT_NORMAL_FOG_DENSITY
 	var from_density: float = _compat_env.fog_density
+	_tween_fog(func(t: float) -> void:
+		_compat_env.fog_density = lerp(from_density, target_density, t)
+	)
+
+
+func _tween_fog(step: Callable) -> void:
 	if _tween:
 		_tween.kill()
 	_tween = create_tween()
-	_tween.tween_method(
-		func(t: float) -> void:
-			_compat_env.fog_density = lerp(from_density, target_density, t),
-		0.0, 1.0, FOG_TRANSITION_DURATION
-	)
+	_tween.tween_method(step, 0.0, 1.0, FOG_TRANSITION_DURATION)

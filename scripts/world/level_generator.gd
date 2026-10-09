@@ -22,7 +22,6 @@ const PANEL_THICKNESS := 0.5    # thickness of floor and wall panels
 # Shared snow terrain surface properties
 const SNOW_COLOR := Color(0.88, 0.94, 1.0)  # slightly blue-tinted white
 const SNOW_ROUGHNESS := 0.88
-const SNOW_TERRAIN_SPEED_DRAIN := 4.0       # speed lost per second when on snow obstacles (moguls, walls)
 
 # Ramps
 const RAMP_ANGLE_MIN := 0.10     # shallowest possible ramp angle
@@ -32,7 +31,6 @@ const RAMP_LENGTH_MAX := 15.0    # longest possible ramp (meters)
 const RAMP_WIDTH := 5.0          # how wide each ramp is
 const BIG_RAMP_LENGTH_SCALE_MIN := 2.0  # minimum length multiplier for big air ramps
 const BIG_RAMP_LENGTH_SCALE_MAX := 3.0  # maximum length multiplier for big air ramps
-const RAMP_THICKNESS := 0.1      # visual thickness of the ramp surface
 const RAMP_SLOT_SPACING := 44.0  # meters between obstacle spawn slots in each section
 const RAMP_MARGIN := 15.0        # clear space kept at the start and end of each section
 
@@ -86,7 +84,6 @@ const VARIANT_CLEAR_CHANCE   := 0.30  # probability of a clear lap (remaining ro
 const STEEP_TILT_ANGLE := 30.0      # tree tilt on steep runs (degrees)
 const NARROWS_FLOOR_WIDTH    := 8.0   # narrower riding surface for THE NARROWS level
 
-# Trees
 # Warning signs
 const SIGN_POST_WIDTH  := 0.07    # thickness of the sign post
 const SIGN_POST_HEIGHT := 2.0     # height of the post
@@ -112,10 +109,6 @@ const RAIL_LENGTH_MAX := 75.0      # longest possible rail (meters)
 const RAIL_PEAK_HEIGHT := 1.5      # how high the flat grinding section is above the ground
 const RAIL_RAMP_SECTION := 4.5     # length of the approach and exit ramps on each end
 const RAIL_RAMP_GAP := 0.1         # small gap between the ramp top and the flat section
-
-# ── Level configs ─────────────────────────────────────────────────────────────
-# Each level: name, chunks before advancing, and obstacle spawn weights.
-# Weights are evaluated in order (tree → rail → mogul → ramp); remaining roll = empty slot.
 
 # ── Tutorial configs ───────────────────────────────────────────────────────────
 # Five hardcoded stages played in order. Each has a variant key (drives tilt + speed)
@@ -150,6 +143,9 @@ const TUTORIAL_LEVELS := [
 		"tree": 0.0, "rail": 0.0, "mogul": 0.0, "ramp": 0.0, "bush": 0.0, "rock": 0.0,
 	},
 ]
+
+# Obstacle spawn weights are evaluated in this order; remaining roll = empty slot.
+const OBSTACLE_ORDER := ["tree", "rail", "mogul", "ramp", "bush", "rock", "pole", "big_ramp", "sign"]
 
 const LEVELS := [
 	{
@@ -190,7 +186,6 @@ const LEVELS := [
 	},
 ]
 
-@export var chunk_scenes: Array[PackedScene] = []
 @export var player: CharacterBody3D
 
 var _active_chunks: Array[Node3D] = []
@@ -241,7 +236,7 @@ func _process(_delta: float) -> void:
 				else:
 					var cfg: Dictionary = TUTORIAL_LEVELS[stage]
 					var variant: String = cfg.get("variant", VARIANT_REGULAR)
-					_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+					_set_tilt_for_variant(variant)
 					GameManager.set_variant(variant)
 					tutorial_stage_changed.emit(stage)
 					level_changed.emit(cfg["name"], stage + 1)
@@ -273,26 +268,21 @@ func _spawn_chunk() -> void:
 		var stage_idx := mini(chunk_idx / TUTORIAL_LAP_CHUNKS, TUTORIAL_STAGE_COUNT - 1)
 		cfg = TUTORIAL_LEVELS[stage_idx]
 		var variant: String = cfg.get("variant", VARIANT_REGULAR)
-		_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+		_set_tilt_for_variant(variant)
 	else:
 		var level_idx := (chunk_idx / LAP_CHUNKS) % LEVELS.size()
 		cfg = LEVELS[level_idx]
 
-	var chunk: Node3D
-	if chunk_scenes.is_empty():
-		chunk = _make_fallback_chunk(cfg)
-	else:
-		chunk = chunk_scenes[randi() % chunk_scenes.size()].instantiate()
-
+	var chunk := _make_chunk(cfg)
 	chunk.position.z = _spawn_z
 	add_child(chunk)
 	_active_chunks.append(chunk)
 	_spawn_z -= CHUNK_LENGTH
 
 
-func _make_fallback_chunk(cfg: Dictionary) -> Node3D:
+func _make_chunk(cfg: Dictionary) -> Node3D:
 	var root := Node3D.new()
-	root.name = "FallbackChunk"
+	root.name = "Chunk"
 	_active_floor_width = cfg.get("floor_width", FLOOR_WIDTH)
 
 	var center_z := -CHUNK_LENGTH * 0.5
@@ -339,44 +329,54 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 	var z := -RAMP_MARGIN
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
-		if roll < cfg.tree:
+		var cumulative := 0.0
+		for key: String in OBSTACLE_ORDER:
+			cumulative += cfg.get(key, 0.0)
+			if roll < cumulative:
+				_add_obstacle(root, key, z)
+				break
+		z -= RAMP_SLOT_SPACING
+
+
+func _add_obstacle(root: Node3D, key: String, z: float) -> void:
+	match key:
+		"tree":
 			var max_offset := _active_floor_width * 0.5 - TREE_FOLIAGE_RADIUS - 0.5
 			var tx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_tree_cluster(Vector3(tx, 0.0, z)))
-		elif roll < cfg.tree + cfg.rail:
+		"rail":
 			var length := randf_range(RAIL_LENGTH_MIN, RAIL_LENGTH_MAX)
 			var max_offset := _active_floor_width * 0.5 - RAIL_WIDTH_COLLISION * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rail(Vector3(rx, 0.0, z - length * 0.5), length))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul:
+		"mogul":
 			root.add_child(_make_mogul_field(Vector3(0.0, 0.0, z)))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp:
+		"ramp":
 			var max_offset := _active_floor_width * 0.5 - RAMP_WIDTH * 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
 			var ramp_length := randf_range(RAMP_LENGTH_MIN, RAMP_LENGTH_MAX)
 			root.add_child(_make_ramp(Vector3(rx, 0.0, z), ramp_angle, ramp_length))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush:
+		"bush":
 			var max_offset := _active_floor_width * 0.5 - BUSH_RADIUS - 0.5
 			var bx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_bush_cluster(Vector3(bx, 0.0, z)))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock:
+		"rock":
 			var max_offset := _active_floor_width * 0.5 - ROCK_RADIUS_MAX - 0.5
 			var rx := randf_range(-max_offset, max_offset)
 			root.add_child(_make_rock_cluster(Vector3(rx, 0.0, z)))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0):
+		"pole":
 			root.add_child(_make_pole_pair(Vector3(0.0, 0.0, z)))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0) + cfg.get("big_ramp", 0.0):
+		"big_ramp":
 			var scale := randf_range(BIG_RAMP_LENGTH_SCALE_MIN, BIG_RAMP_LENGTH_SCALE_MAX)
 			var ramp_angle := randf_range(RAMP_ANGLE_MIN, RAMP_ANGLE_MAX)
 			var ramp_length := randf_range(RAMP_LENGTH_MIN, RAMP_LENGTH_MAX) * scale
 			var ramp_width := (_active_floor_width + WALL_WIDTH * 2.0) * 0.95
 			root.add_child(_make_ramp(Vector3(0.0, 0.0, z), ramp_angle, ramp_length, ramp_width))
-		elif roll < cfg.tree + cfg.rail + cfg.mogul + cfg.ramp + cfg.bush + cfg.rock + cfg.get("pole", 0.0) + cfg.get("big_ramp", 0.0) + cfg.get("sign", 0.0):
+		"sign":
 			var side := 1.0 if randf() > 0.5 else -1.0
 			var sx := side * randf_range(_active_floor_width * 0.3, _active_floor_width * 0.45)
 			root.add_child(_make_warning_sign(Vector3(sx, 0.0, z)))
-		z -= RAMP_SLOT_SPACING
 
 
 func _make_ramp(origin: Vector3, angle: float, length: float, width: float = RAMP_WIDTH) -> StaticBody3D:
@@ -1001,6 +1001,10 @@ func _make_panel(pos: Vector3, rot_z: float, size: Vector3, is_snow_terrain: boo
 	return body
 
 
+func _set_tilt_for_variant(variant: String) -> void:
+	_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+
+
 func _pick_variant() -> void:
 	var roll := randf()
 	if roll < VARIANT_MISTY_CHANCE:
@@ -1011,7 +1015,7 @@ func _pick_variant() -> void:
 		_active_variant = VARIANT_CLEAR
 	else:
 		_active_variant = VARIANT_REGULAR
-	_active_tilt_angle = STEEP_TILT_ANGLE if _active_variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+	_set_tilt_for_variant(_active_variant)
 	GameManager.set_variant(_active_variant)
 	variant_changed.emit(_active_variant)
 
@@ -1042,7 +1046,7 @@ func _reset() -> void:
 	if GameManager.is_tutorial:
 		var cfg: Dictionary = TUTORIAL_LEVELS[0]
 		var variant: String = cfg.get("variant", VARIANT_REGULAR)
-		_active_tilt_angle = STEEP_TILT_ANGLE if variant == VARIANT_STEEP else DOWNHILL_TILT_ANGLE
+		_set_tilt_for_variant(variant)
 		GameManager.set_variant(variant)
 		for i in range(CHUNKS_AHEAD + 1):
 			_spawn_chunk()

@@ -8,37 +8,21 @@ var _collide_player: AudioStreamPlayer
 
 
 func _ready() -> void:
-	var grind_stream := load("res://assets/audio/sfx/railgrind.mp3") as AudioStreamMP3
-	grind_stream.loop = true
-	_grind_player = AudioStreamPlayer.new()
-	_grind_player.stream = grind_stream
-	add_child(_grind_player)
-
-	var snow_stream := load("res://assets/audio/sfx/on snow.mp3") as AudioStreamMP3
-	snow_stream.loop = true
-	_snow_player = AudioStreamPlayer.new()
-	_snow_player.stream = snow_stream
-	add_child(_snow_player)
-
-	var land_stream := load("res://assets/audio/sfx/landing.mp3") as AudioStreamMP3
-	land_stream.loop = false
-	_land_player = AudioStreamPlayer.new()
-	_land_player.stream = land_stream
-	add_child(_land_player)
-
-	var air_stream := load("res://assets/audio/sfx/midair.mp3") as AudioStreamMP3
-	air_stream.loop = false
-	_air_player = AudioStreamPlayer.new()
-	_air_player.stream = air_stream
-	add_child(_air_player)
-
-	var collide_stream := load("res://assets/audio/sfx/collide.mp3") as AudioStreamMP3
-	collide_stream.loop = false
-	_collide_player = AudioStreamPlayer.new()
-	_collide_player.stream = collide_stream
-	add_child(_collide_player)
-
+	_grind_player = _make_player("res://assets/audio/sfx/railgrind.mp3", true)
+	_snow_player = _make_player("res://assets/audio/sfx/on snow.mp3", true)
+	_land_player = _make_player("res://assets/audio/sfx/landing.mp3", false)
+	_air_player = _make_player("res://assets/audio/sfx/midair.mp3", false)
+	_collide_player = _make_player("res://assets/audio/sfx/collide.mp3", false)
 	GameManager.state_changed.connect(_on_state_changed)
+
+
+func _make_player(path: String, loop: bool) -> AudioStreamPlayer:
+	var stream := load(path) as AudioStreamMP3
+	stream.loop = loop
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	add_child(player)
+	return player
 
 
 func set_grinding(active: bool) -> void:
@@ -70,8 +54,5 @@ func play_collide() -> void:
 
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state != GameManager.State.PLAYING:
-		_grind_player.stop()
-		_snow_player.stop()
-		_land_player.stop()
-		_air_player.stop()
-		_collide_player.stop()
+		for player: AudioStreamPlayer in get_children():
+			player.stop()

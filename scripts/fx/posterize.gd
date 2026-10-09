@@ -1,7 +1,5 @@
 extends ColorRect
 
-@export var levels: float = 6.0
-
 const BASE_LEVELS := 9.0              # normal number of color steps during play (higher = smoother)
 const MIN_COMBO_LEVELS := 4.5         # fewest color steps at high combo — image gets grittier/crunchier
 const STOMP_LEVELS := 2.0             # color steps during a perfect stomp flash (very crunchy for a moment)
@@ -12,7 +10,6 @@ const DANGER_SPEED_THRESHOLD := 40.0  # speed above which speed lines begin
 const LEAN_FORWARD_MAX_SPEED  := 55.0  # player's lean-forward speed cap (must match player.gd export)
 const MAX_SPEED_LINES := 1.0           # speed lines intensity at max lean-forward speed
 
-var _target_levels: float = BASE_LEVELS
 var _current_levels: float = BASE_LEVELS
 var _flash_timer: float = 0.0
 var _combo_target_levels: float = BASE_LEVELS
@@ -26,11 +23,10 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://assets/shaders/posterize.gdshader")
-	mat.set_shader_parameter("levels", levels)
+	mat.set_shader_parameter("levels", BASE_LEVELS)
 	mat.set_shader_parameter("speed_lines", 0.0)
 	material = mat
-	_current_levels = levels
-	_target_levels = levels
+	_current_levels = BASE_LEVELS
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	ScoreManager.trick_landed.connect(_on_trick_landed)
 	GameManager.state_changed.connect(_on_state_changed)
@@ -45,13 +41,11 @@ func _process(delta: float) -> void:
 		overspeed_ratio = clampf(
 			(GameManager.current_speed - DANGER_SPEED_THRESHOLD) / (LEAN_FORWARD_MAX_SPEED - DANGER_SPEED_THRESHOLD),
 			0.0, 1.0)
-	_target_levels = _combo_target_levels
-
 	if _flash_timer > 0.0:
 		_flash_timer -= delta
 		_current_levels = STOMP_LEVELS
 	else:
-		_current_levels = lerpf(_current_levels, _target_levels, 5.0 * delta)
+		_current_levels = lerpf(_current_levels, _combo_target_levels, 5.0 * delta)
 	material.set_shader_parameter("levels", _current_levels)
 
 	var target_speed_lines := overspeed_ratio * MAX_SPEED_LINES
@@ -71,7 +65,6 @@ func _on_trick_landed(is_stomp: bool) -> void:
 
 func _on_game_started() -> void:
 	_combo_target_levels = BASE_LEVELS
-	_target_levels = BASE_LEVELS
 	_current_levels = BASE_LEVELS
 	_flash_timer = 0.0
 	_current_speed_lines = 0.0

@@ -3,8 +3,6 @@ extends Node
 signal appearance_changed
 signal unlock_changed
 
-const ELECTRIC_BLUE_BOARD := Color(0.04, 0.42, 1.0)
-
 var jerry_color: Color = Color(1.0, 0.45, 0.05)
 var board_color: Color = Color(0.18, 0.18, 0.18)
 var tutorial_board_unlocked: bool = false
