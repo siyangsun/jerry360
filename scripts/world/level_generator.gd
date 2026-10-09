@@ -224,7 +224,7 @@ const LEVELS := [
 		"name": "THE NARROWS",
 		"chunks": 5,
 		"floor_width": NARROWS_FLOOR_WIDTH,
-		"tree": 0.12, "rail": 0.30, "mogul": 0.20, "ramp": 0.15, "bush": 0.00, "rock": 0.18, "sign": 0.10,
+		"tree": 0.10, "rail": 0.26, "mogul": 0.17, "ramp": 0.13, "bush": 0.00, "rock": 0.15, "sign": 0.09,
 	},
 	{
 		"name": "THE LIFT AREA",

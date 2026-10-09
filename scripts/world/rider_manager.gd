@@ -4,6 +4,7 @@ const AiRider = preload("res://scripts/world/ai_rider.gd")
 
 const SPAWN_DISTANCE_AHEAD := 110.0   # how far in front of the player riders appear
 const DESPAWN_DISTANCE_BEHIND := 35.0 # how far behind the player before a rider is freed
+const MAIN_RUN_LEVEL_KEYWORD := "LIFT AREA"  # level name fragment that hosts the busy rider crowd
 const MAX_RIDERS_MAIN_RUN := 8
 const SPAWN_INTERVAL_MAIN_RUN := 1.2  # seconds between spawns on a main run
 const MAX_RIDERS_AFTERNOON := 2
@@ -82,7 +83,7 @@ func _despawn_stale() -> void:
 
 
 func _on_level_changed(level_name: String, _level_number: int) -> void:
-	_is_main_run = "MAIN LANE" in level_name
+	_is_main_run = MAIN_RUN_LEVEL_KEYWORD in level_name
 	if _is_main_run:
 		_spawn_timer = 0.5  # kick off a spawn quickly when the level starts
 

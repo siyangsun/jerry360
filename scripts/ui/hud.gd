@@ -234,7 +234,7 @@ func _ready() -> void:
 	add_child(_woohoo_label)
 
 	_wife_audio = AudioStreamPlayer.new()
-	_wife_audio.stream = load("res://assets/audio/are_you_having_fun.mp3")
+	_wife_audio.stream = preload("res://assets/audio/sfx/are you having fun.mp3")
 	add_child(_wife_audio)
 
 	MusicManager.song_changed.connect(_on_song_changed)
