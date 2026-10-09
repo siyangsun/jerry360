@@ -15,6 +15,9 @@ var _flash_timer: float = 0.0
 var _combo_target_levels: float = BASE_LEVELS
 var _current_speed_lines: float = 0.0
 var _player: CharacterBody3D
+var _mat: ShaderMaterial
+var _last_levels: float = -1.0       # last values written to the shader (-1 = never written)
+var _last_speed_lines: float = -1.0
 
 
 func _ready() -> void:
@@ -26,6 +29,9 @@ func _ready() -> void:
 	mat.set_shader_parameter("levels", BASE_LEVELS)
 	mat.set_shader_parameter("speed_lines", 0.0)
 	material = mat
+	_mat = mat
+	_last_levels = BASE_LEVELS
+	_last_speed_lines = 0.0
 	_current_levels = BASE_LEVELS
 	ScoreManager.combo_changed.connect(_on_combo_changed)
 	ScoreManager.trick_landed.connect(_on_trick_landed)
@@ -46,11 +52,15 @@ func _process(delta: float) -> void:
 		_current_levels = STOMP_LEVELS
 	else:
 		_current_levels = lerpf(_current_levels, _combo_target_levels, 5.0 * delta)
-	material.set_shader_parameter("levels", _current_levels)
+	if _current_levels != _last_levels:
+		_last_levels = _current_levels
+		_mat.set_shader_parameter("levels", _current_levels)
 
 	var target_speed_lines := overspeed_ratio * MAX_SPEED_LINES
 	_current_speed_lines = lerpf(_current_speed_lines, target_speed_lines, 4.0 * delta)
-	material.set_shader_parameter("speed_lines", _current_speed_lines)
+	if _current_speed_lines != _last_speed_lines:
+		_last_speed_lines = _current_speed_lines
+		_mat.set_shader_parameter("speed_lines", _current_speed_lines)
 
 
 func _on_combo_changed(count: int, _multiplier: float) -> void:
@@ -73,4 +83,5 @@ func _on_game_started() -> void:
 func _on_state_changed(new_state: GameManager.State) -> void:
 	if new_state == GameManager.State.DEAD:
 		_current_speed_lines = 0.0
-		material.set_shader_parameter("speed_lines", 0.0)
+		_last_speed_lines = 0.0
+		_mat.set_shader_parameter("speed_lines", 0.0)

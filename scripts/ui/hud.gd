@@ -45,6 +45,13 @@ const WIFE_KILL_TEXT := "No? Aww, I'm sorry. Come home whenever you get the chan
 var _elapsed: float = 0.0
 var _lap_time: float = 0.0
 var _best_lap: float = INF
+
+# Last values written to the distance/fun labels; text is only rebuilt when these change
+var _shown_dist: int = -1
+var _shown_speed: int = -1
+var _shown_elapsed: int = -1
+var _shown_best: int = -2
+var _shown_fun: int = -1
 var _next_lap_dist: float = LAP_DISTANCE
 var _combo_label: Label
 var _goofy_label: Label
@@ -476,13 +483,23 @@ func _process(delta: float) -> void:
 				_best_lap = _lap_time
 			_lap_time = 0.0
 			_next_lap_dist += LAP_DISTANCE
-		var mins := int(_elapsed) / 60
-		var secs := int(_elapsed) % 60
-		var best_str := "--:--"
-		if _best_lap < INF:
-			best_str = "%d:%02d" % [int(_best_lap) / 60, int(_best_lap) % 60]
-		distance_label.text = "%.0f m\n%.0f m/s\n%d:%02d\nBest %s" % [ScoreManager.distance, GameManager.current_speed, mins, secs, best_str]
-		_fun_had_label.text = "fun had: %.0f" % ScoreManager.fun
+		var dist_m := roundi(ScoreManager.distance)
+		var speed_ms := roundi(GameManager.current_speed)
+		var elapsed_s := int(_elapsed)
+		var best_s := int(_best_lap) if _best_lap < INF else -1
+		if dist_m != _shown_dist or speed_ms != _shown_speed or elapsed_s != _shown_elapsed or best_s != _shown_best:
+			_shown_dist = dist_m
+			_shown_speed = speed_ms
+			_shown_elapsed = elapsed_s
+			_shown_best = best_s
+			var best_str := "--:--"
+			if best_s >= 0:
+				best_str = "%d:%02d" % [best_s / 60, best_s % 60]
+			distance_label.text = "%d m\n%d m/s\n%d:%02d\nBest %s" % [dist_m, speed_ms, elapsed_s / 60, elapsed_s % 60, best_str]
+		var fun_shown := roundi(ScoreManager.fun)
+		if fun_shown != _shown_fun:
+			_shown_fun = fun_shown
+			_fun_had_label.text = "fun had: %d" % fun_shown
 
 		if _wow_timer <= 0.0 and ScoreManager.fun_rate > fun_rate_wow_threshold:
 			_wow_timer = wow_display_time

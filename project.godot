@@ -95,3 +95,5 @@ pitch_back={
 textures/canvas_textures/default_texture_filter=0
 lights_and_shadows/directional_shadow/size=1024
 lights_and_shadows/directional_shadow/size.mobile=1024
+environment/volumetric_fog/volume_size=48
+environment/volumetric_fog/volume_depth=48

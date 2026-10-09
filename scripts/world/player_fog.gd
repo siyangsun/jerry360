@@ -16,6 +16,9 @@ var _player: Node3D
 var _tween: Tween
 var _use_compat_fog: bool = false
 var _compat_env: Environment
+var _env: Environment            # world environment; volumetric fog is switched off on clear laps
+var _mat: ShaderMaterial         # cached fog shader material
+var _last_player_pos: Vector3 = Vector3.INF  # last position written to the shader (INF = never written)
 
 
 func _ready() -> void:
@@ -25,12 +28,9 @@ func _ready() -> void:
 	if gen:
 		gen.variant_changed.connect(_on_variant_changed)
 
+	var world_env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
 	if _use_compat_fog:
 		visible = false
-		var lateral_fog := get_parent().get_node_or_null("LateralFog")
-		if lateral_fog:
-			lateral_fog.visible = false
-		var world_env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
 		if world_env:
 			_compat_env = world_env.environment
 			_compat_env.volumetric_fog_enabled = false
@@ -38,9 +38,11 @@ func _ready() -> void:
 			_compat_env.fog_enabled = true
 			_compat_env.fog_density = COMPAT_NORMAL_FOG_DENSITY
 	else:
-		var mat := material as ShaderMaterial
-		mat.set_shader_parameter("fog_radius", NORMAL_FOG_RADIUS)
-		mat.set_shader_parameter("fog_falloff", NORMAL_FOG_FALLOFF)
+		if world_env:
+			_env = world_env.environment
+		_mat = material as ShaderMaterial
+		_mat.set_shader_parameter("fog_radius", NORMAL_FOG_RADIUS)
+		_mat.set_shader_parameter("fog_falloff", NORMAL_FOG_FALLOFF)
 
 
 func _process(_delta: float) -> void:
@@ -49,7 +51,9 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player") as Node3D
 		return
-	(material as ShaderMaterial).set_shader_parameter("player_pos", _player.position)
+	if _player.position != _last_player_pos:
+		_last_player_pos = _player.position
+		_mat.set_shader_parameter("player_pos", _last_player_pos)
 
 
 func _on_variant_changed(variant: String) -> void:
@@ -57,7 +61,6 @@ func _on_variant_changed(variant: String) -> void:
 		_compat_variant_changed(variant)
 		return
 
-	var mat := material as ShaderMaterial
 	var target_radius: float
 	var target_falloff: float
 	if variant == "misty":
@@ -70,15 +73,28 @@ func _on_variant_changed(variant: String) -> void:
 		target_radius = NORMAL_FOG_RADIUS
 		target_falloff = NORMAL_FOG_FALLOFF
 
-	var from_radius: float = mat.get_shader_parameter("fog_radius")
-	var from_falloff: float = mat.get_shader_parameter("fog_falloff")
+	var from_radius: float = _mat.get_shader_parameter("fog_radius")
+	var from_falloff: float = _mat.get_shader_parameter("fog_falloff")
 
 	var log_r0 := log(from_radius);   var log_r1 := log(target_radius)
 	var log_f0 := log(from_falloff);  var log_f1 := log(target_falloff)
+
+	# Volumetric fog is pure cost on clear laps (the bubble is effectively infinite): turn it on
+	# before blending away from clear, and off only once the blend into clear has finished.
+	var is_clear := variant == "clear"
+	if not is_clear:
+		_set_volumetric_fog(true)
 	_tween_fog(func(t: float) -> void:
-		mat.set_shader_parameter("fog_radius",  exp(lerp(log_r0, log_r1, t)))
-		mat.set_shader_parameter("fog_falloff", exp(lerp(log_f0, log_f1, t)))
+		_mat.set_shader_parameter("fog_radius",  exp(lerp(log_r0, log_r1, t)))
+		_mat.set_shader_parameter("fog_falloff", exp(lerp(log_f0, log_f1, t)))
 	)
+	if is_clear:
+		_tween.finished.connect(_set_volumetric_fog.bind(false))
+
+
+func _set_volumetric_fog(enabled: bool) -> void:
+	if is_instance_valid(_env) and _env.volumetric_fog_enabled != enabled:
+		_env.volumetric_fog_enabled = enabled
 
 
 func _compat_variant_changed(variant: String) -> void:

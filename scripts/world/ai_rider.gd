@@ -9,6 +9,20 @@ const LANE_SWITCH_INTERVAL_MAX := 9.0
 const SPEED_VARIANCE_MIN := 0.82
 const SPEED_VARIANCE_MAX := 1.08
 
+const BODY_SIZE := Vector3(0.3, 1.0, 0.6)       # rider body box
+const BODY_METALLIC := 0.9
+const BODY_SPECULAR := 1.0
+const BODY_ROUGHNESS := 0.05
+const BODY_CENTER_Y := 0.5
+const BOARD_SIZE := Vector3(0.55, 0.08, 1.44)   # snowboard box
+const BOARD_COLOR := Color(0.18, 0.18, 0.18)
+const BOARD_ROUGHNESS := 1.0
+const BOARD_CENTER_Y := 0.04
+const COLLIDER_RADIUS := 0.3                    # solid capsule (matches Jerry's)
+const COLLIDER_HEIGHT := 1.0
+const HIT_AREA_RADIUS := 0.42                   # kill-zone capsule that crashes Jerry
+const HIT_AREA_HEIGHT := 1.2
+
 const RIDER_COLORS: Array[Color] = [
 	Color(1.0, 0.45, 0.05),   # burnt orange
 	Color(0.12, 0.22, 0.75),  # navy
@@ -25,6 +39,12 @@ var _wipeout_wobble_freq: float  = 14.0
 var _wipeout_wobble_amp: float   = 0.7
 var _wipeout_phase1_end: float   = 0.35
 var _wipeout_phase2_end: float   = 0.75
+
+# Shared across every rider: one mesh per color, one board mesh, one pair of shapes
+static var _body_meshes: Array[BoxMesh] = []
+static var _board_mesh: BoxMesh
+static var _collider_shape: CapsuleShape3D
+static var _hit_area_shape: CapsuleShape3D
 
 var _speed_variance: float = 1.0
 var _target_lane: int = 1
@@ -60,8 +80,7 @@ func _ready() -> void:
 		_wipeout_phase1_end    = player.wipeout_phase1_end
 		_wipeout_phase2_end    = player.wipeout_phase2_end
 
-	var color := RIDER_COLORS[randi() % RIDER_COLORS.size()]
-	_build_visuals(color)
+	_build_visuals(randi() % RIDER_COLORS.size())
 	_build_collision()
 
 
@@ -144,35 +163,52 @@ func _pick_new_lane() -> void:
 		_target_lane = options[randi() % options.size()]
 
 
-func _build_visuals(color: Color) -> void:
+func _build_visuals(color_index: int) -> void:
 	_mesh_pivot = Node3D.new()
 	add_child(_mesh_pivot)
 
-	var body_mat := StandardMaterial3D.new()
-	body_mat.albedo_color = color
-	body_mat.metallic = 0.9
-	body_mat.metallic_specular = 1.0
-	body_mat.roughness = 0.05
-
 	var body_mesh := MeshInstance3D.new()
-	var body_box := BoxMesh.new()
-	body_box.size = Vector3(0.3, 1.0, 0.6)
-	body_box.material = body_mat
-	body_mesh.mesh = body_box
-	body_mesh.position.y = 0.5
+	body_mesh.mesh = _get_body_mesh(color_index)
+	body_mesh.position.y = BODY_CENTER_Y
 	_mesh_pivot.add_child(body_mesh)
 
-	var board_mat := StandardMaterial3D.new()
-	board_mat.albedo_color = Color(0.18, 0.18, 0.18)
-	board_mat.roughness = 1.0
-
 	var board_mesh := MeshInstance3D.new()
-	var board_box := BoxMesh.new()
-	board_box.size = Vector3(0.55, 0.08, 1.44)
-	board_box.material = board_mat
-	board_mesh.mesh = board_box
-	board_mesh.position.y = 0.04
+	board_mesh.mesh = _get_board_mesh()
+	board_mesh.position.y = BOARD_CENTER_Y
 	_mesh_pivot.add_child(board_mesh)
+
+
+static func _get_body_mesh(color_index: int) -> BoxMesh:
+	if _body_meshes.is_empty():
+		for color in RIDER_COLORS:
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = color
+			mat.metallic = BODY_METALLIC
+			mat.metallic_specular = BODY_SPECULAR
+			mat.roughness = BODY_ROUGHNESS
+			var box := BoxMesh.new()
+			box.size = BODY_SIZE
+			box.material = mat
+			_body_meshes.append(box)
+	return _body_meshes[color_index]
+
+
+static func _get_board_mesh() -> BoxMesh:
+	if _board_mesh == null:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = BOARD_COLOR
+		mat.roughness = BOARD_ROUGHNESS
+		_board_mesh = BoxMesh.new()
+		_board_mesh.size = BOARD_SIZE
+		_board_mesh.material = mat
+	return _board_mesh
+
+
+static func _get_capsule(radius: float, height: float) -> CapsuleShape3D:
+	var shape := CapsuleShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	return shape
 
 
 func _on_jerry_getting_up() -> void:
@@ -199,23 +235,21 @@ func _on_jerry_getting_up() -> void:
 
 
 func _build_collision() -> void:
+	if _collider_shape == null:
+		_collider_shape = _get_capsule(COLLIDER_RADIUS, COLLIDER_HEIGHT)
+		_hit_area_shape = _get_capsule(HIT_AREA_RADIUS, HIT_AREA_HEIGHT)
+
 	var col := CollisionShape3D.new()
-	var shape := CapsuleShape3D.new()
-	shape.radius = 0.3
-	shape.height = 1.0
-	col.position.y = 0.5
-	col.shape = shape
+	col.position.y = BODY_CENTER_Y
+	col.shape = _collider_shape
 	add_child(col)
 
 	var area := Area3D.new()
 	area.collision_layer = 0
 	area.collision_mask = 1
 	var area_col := CollisionShape3D.new()
-	var area_shape := CapsuleShape3D.new()
-	area_shape.radius = 0.42
-	area_shape.height = 1.2
-	area_col.position.y = 0.5
-	area_col.shape = area_shape
+	area_col.position.y = BODY_CENTER_Y
+	area_col.shape = _hit_area_shape
 	area.add_child(area_col)
 	area.body_entered.connect(func(body: Node3D) -> void:
 		if body.has_method("crash"):

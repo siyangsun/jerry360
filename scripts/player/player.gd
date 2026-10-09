@@ -155,8 +155,14 @@ var _wipeout_danger_reason: WipeoutReason = WipeoutReason.NONE
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 
 const COLLIDER_FULL_HEIGHT := 1.0
+const COLLIDER_HEIGHT_EPSILON := 0.001  # capsule height is only rewritten when it changes by more than this
 
 var _capsule: CapsuleShape3D
+
+# Per-tick caches, refreshed at the top of _physics_process (rail also refreshed after move_and_slide)
+var _turn_input: float = 0.0
+var _lean_input: float = 0.0
+var _on_rail: bool = false
 
 
 func _ready() -> void:
@@ -195,6 +201,10 @@ func _physics_process(delta: float) -> void:
 		_handle_wipeout(delta)
 		return
 
+	_turn_input = Input.get_axis("move_left", "move_right")
+	_lean_input = Input.get_axis("lean_left", "lean_right")
+	_on_rail = _is_on_rail()
+
 	_is_leaning_fwd = is_on_floor() and Input.is_action_pressed("lean_forward")
 	_is_leaning_back = is_on_floor() and Input.is_action_pressed("lean_back") and not _is_leaning_fwd
 	_is_squatting = is_on_floor() and Input.is_action_pressed("jump")
@@ -211,6 +221,7 @@ func _physics_process(delta: float) -> void:
 	velocity.x = board_vel_x + _lean_vel_x
 	velocity.z = -cos(_board_yaw) * GameManager.current_speed
 	move_and_slide()
+	_on_rail = _is_on_rail()
 
 	# Recover lean contribution after collision response
 	_lean_vel_x = velocity.x - sin(_board_yaw) * GameManager.current_speed
@@ -234,11 +245,9 @@ func _physics_process(delta: float) -> void:
 	if not _is_leaning_fwd and is_on_floor() and GameManager.current_speed > GameManager.MAX_SPEED:
 		GameManager.current_speed = maxf(GameManager.current_speed - lean_boost_decay * delta, GameManager.MAX_SPEED)
 
-	var turn_input := Input.get_axis("move_left", "move_right")
-	var lean_input := Input.get_axis("lean_left", "lean_right")
-	GameManager.ramp_multiplier = 1.0 if (abs(turn_input) > 0.1 or abs(lean_input) > 0.1) else GameManager.STRAIGHT_RAMP_MULT
+	GameManager.ramp_multiplier = 1.0 if (abs(_turn_input) > 0.1 or abs(_lean_input) > 0.1) else GameManager.STRAIGHT_RAMP_MULT
 
-	var on_rail := _is_on_rail()
+	var on_rail := _on_rail
 	_spark_particles.emitting = on_rail
 	if on_rail != _was_on_rail:
 		SfxManager.set_grinding(on_rail)
@@ -263,7 +272,7 @@ func _physics_process(delta: float) -> void:
 
 	# Visual tilt and yaw — lean (A/D) drives body roll, turn (arrows) drives board yaw
 	if is_instance_valid(mesh_pivot):
-		if not _is_leaning_fwd and not _is_leaning_back and not _is_on_rail():
+		if not _is_leaning_fwd and not _is_leaning_back and not _on_rail:
 			if Input.is_action_just_pressed("move_right"):
 				_turn_burst_frames = turn_burst_frames
 				_turn_burst_dir = 1.0
@@ -275,7 +284,7 @@ func _physics_process(delta: float) -> void:
 				mesh_pivot.rotation.y -= _turn_burst_dir * turn_burst_yaw
 				_turn_burst_frames -= 1
 
-		var lean_target := -lean_input * lean_tilt_visual_scale - _lean_vel_x * lean_vel_tilt_visual_scale
+		var lean_target := -_lean_input * lean_tilt_visual_scale - _lean_vel_x * lean_vel_tilt_visual_scale
 		mesh_pivot.rotation.z = lerpf(mesh_pivot.rotation.z, lean_target, 10.0 * delta)
 		if is_on_floor():
 			var pitch_target := 0.0
@@ -288,14 +297,16 @@ func _physics_process(delta: float) -> void:
 			mesh_pivot.rotation.x = lerpf(mesh_pivot.rotation.x, _air_spin_x, air_spin_lerp_speed * delta)
 		var squat_y := lerpf(_squat_root.scale.y, lerpf(1.0, charge_squat_scale, _charge_timer / charge_max_time), 12.0 * delta)
 		_squat_root.scale = Vector3(1.0, squat_y, 1.0)
-		_capsule.height = COLLIDER_FULL_HEIGHT * squat_y
-		_collision_shape.position.y = _capsule.height * 0.5
+		var target_height := COLLIDER_FULL_HEIGHT * squat_y
+		if absf(target_height - _capsule.height) > COLLIDER_HEIGHT_EPSILON:
+			_capsule.height = target_height
+			_collision_shape.position.y = _capsule.height * 0.5
 		if is_instance_valid(_board_pivot):
 			_board_pivot.rotation = mesh_pivot.rotation
 			if _is_leaning_fwd:
 				_board_pivot.rotation.x = 0.0
 		if is_on_floor():
-			if not _is_on_rail():
+			if not _on_rail:
 				var stance_offset := PI if is_goofy else 0.0
 				var ground_yaw := stance_offset - _board_yaw
 				var yaw_min := lean_forward_recovery_yaw if _is_leaning_fwd else recovery_yaw_min
@@ -320,7 +331,7 @@ func _physics_process(delta: float) -> void:
 
 # A/D: lean body, biases lateral velocity
 func _handle_lean(delta: float) -> void:
-	var input := Input.get_axis("lean_left", "lean_right")
+	var input := _lean_input
 	var accel_mult := _boost_multiplier
 	var lean_mult := lean_forward_lateral_mult if _is_leaning_fwd else 1.0
 	var carve_mult := turn_burst_accel_factor if (_turn_burst_frames > 0 and not _is_leaning_fwd) else 1.0
@@ -342,9 +353,9 @@ func _handle_lean(delta: float) -> void:
 
 # Left/Right arrows: rotate board direction, changes movement vector
 func _handle_board_turn(delta: float) -> void:
-	if not is_on_floor() or _is_on_rail():
+	if not is_on_floor() or _on_rail:
 		return
-	var input := Input.get_axis("move_left", "move_right")
+	var input := _turn_input
 	var target_vel := input * board_turn_speed
 	var accel := board_turn_accel if input != 0.0 else board_turn_brake
 	_board_yaw_vel = move_toward(_board_yaw_vel, target_vel, accel * delta)
@@ -361,10 +372,8 @@ func _evaluate_wipeout_danger(delta: float) -> void:
 	var best_reason := WipeoutReason.NONE
 
 	# — Conflict danger (ground): yaw without tilt, or opposing lean+turn —
-	if is_on_floor() and GameManager.current_speed >= conflict_min_speed and not _is_on_rail():
-		var lean_input := Input.get_axis("lean_left", "lean_right")
-		var turn_input := Input.get_axis("move_left", "move_right")
-		if lean_input * turn_input < -conflict_opposing_threshold or (lean_input == 0 and abs(turn_input) > 0):
+	if is_on_floor() and GameManager.current_speed >= conflict_min_speed and not _on_rail:
+		if _lean_input * _turn_input < -conflict_opposing_threshold or (_lean_input == 0 and abs(_turn_input) > 0):
 			_conflict_timer += delta
 			if _conflict_timer >= conflict_wipeout_time:
 				_conflict_timer = 0.0
@@ -437,9 +446,8 @@ func _fire_jump() -> void:
 	var ramp_z_excess := clampf(get_floor_normal().z - base_slope_z, 0.0, 1.0)
 	var ramp_boost := ramp_z_excess * GameManager.current_speed * ramp_jump_factor
 	velocity.y = jump_velocity + boost + ramp_boost
-	if _is_on_rail() or abs(get_floor_normal().x) > WALL_NORMAL_THRESHOLD:
-		var dir := Input.get_axis("lean_left", "lean_right")
-		velocity.x = dir * max_lateral_speed * rail_jump_lateral_factor
+	if _on_rail or abs(get_floor_normal().x) > WALL_NORMAL_THRESHOLD:
+		velocity.x = _lean_input * max_lateral_speed * rail_jump_lateral_factor
 
 
 func _apply_gravity(delta: float) -> void:
@@ -456,13 +464,13 @@ func _apply_wall_gravity(delta: float) -> void:
 
 # Arrows spin in air (tricks); A/D lateral drift handled in _handle_lean
 func _handle_air_spin(delta: float) -> void:
-	var on_rail := _is_on_rail()
+	var on_rail := _on_rail
 	if is_on_floor() and not on_rail:
 		_rail_spin_acc = 0.0
 		_rail_tricks = 0
 		_air_pitch_vel = 0.0
 		return
-	var input := Input.get_axis("move_left", "move_right")
+	var input := _turn_input
 	var spin_delta := input * air_turn_speed * delta
 	_air_spin_y -= spin_delta
 	if on_rail:
@@ -502,10 +510,10 @@ func _handle_landing() -> void:
 	var on_floor := is_on_floor()
 	if on_floor and not _was_on_floor:
 		SfxManager.play_landing()
-		if not _is_on_rail():
+		if not _on_rail:
 			_snow_particles.restart()
 
-		if _is_on_rail():
+		if _on_rail:
 			# Rail landing — mark rail involvement, keep trick active
 			if _air_time > 0.0:
 				_trick_had_rail = true
@@ -630,13 +638,13 @@ func _fall_off() -> void:
 
 
 func _handle_lean_forward(delta: float) -> void:
-	if not _is_leaning_fwd or _is_on_rail():
+	if not _is_leaning_fwd or _on_rail:
 		return
 	GameManager.current_speed = minf(GameManager.current_speed + lean_forward_accel * delta, lean_forward_max_speed)
 
 
 func _handle_snow_terrain_drag(delta: float) -> void:
-	var on_snow := is_on_floor() and not _is_on_rail()
+	var on_snow := is_on_floor() and not _on_rail
 	if on_snow:
 		for i in get_slide_collision_count():
 			var col := get_slide_collision(i)
@@ -649,7 +657,7 @@ func _handle_snow_terrain_drag(delta: float) -> void:
 
 
 func _handle_rail_lock(delta: float) -> void:
-	if not _is_on_rail() or velocity.y > 0.0 or _is_leaning_fwd:
+	if not _on_rail or velocity.y > 0.0 or _is_leaning_fwd:
 		return
 	velocity.x = 0.0
 	_lean_vel_x = 0.0

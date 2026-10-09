@@ -9,7 +9,8 @@ signal tutorial_stage_changed(stage_index: int)
 signal tutorial_complete
 
 const CHUNK_LENGTH := 80.0      # length of each generated section of mountain (meters)
-const CHUNKS_AHEAD := 10        # how many sections are built in front of Jerry at all times
+const CHUNKS_AHEAD := 6         # how many sections are built in front of Jerry at all times
+const OBSTACLE_BUILDS_PER_FRAME := 1  # queued obstacles built per frame (spreads chunk cost across frames)
 const CHUNKS_BEHIND := 2        # how many sections are kept behind Jerry before being deleted
 const LAP_CHUNKS := 5           # how many sections make up one lap
 
@@ -47,6 +48,8 @@ const BUSH_RADIUS := 1.3         # how wide each bush is
 const BUSH_HEIGHT := 1.5         # how tall each bush is
 const BUSH_SINK := 0.2           # how far the base dips into the floor
 const BUSH_CLUSTER_SPREAD := 2.0 # how spread out bushes are within a cluster
+const BUSH_AREA_RADIUS_FACTOR := 0.85  # crash cylinder radius = BUSH_RADIUS * this
+const BUSH_NEAR_RADIUS := 2.2    # close-call sphere radius
 
 # Rock crystals (crags only)
 const ROCK_SEGMENTS := 6                       # hexagonal prism cross-section
@@ -59,6 +62,8 @@ const ROCK_TILT_X_MAX := 0.45                  # max random forward/back tilt (r
 const ROCK_TILT_Z_MAX := 0.35                  # max random side tilt (radians)
 const ROCK_CLUSTER_SPREAD := 3.5              # how spread out crystals are within a clump
 const ROCK_COLOR := Color(0.16, 0.17, 0.20)    # cool dark gray with slight blue cast
+const ROCK_ROUGHNESS := 0.90                   # rock material roughness
+const ROCK_NEAR_PADDING := 1.5                 # close-call sphere radius = crystal radius + this
 
 # Poles (Lift Area only) — T-shaped lift poles: vertical shaft + horizontal crossbar
 const POLE_SHAFT_WIDTH  := 0.18    # width and depth of the vertical shaft
@@ -69,6 +74,11 @@ const POLE_BAR_DEPTH    := 0.22    # depth of the crossbar
 const POLE_SINK         := 0.1     # how far the base sits below ground level
 const POLE_PAIR_SPREAD  := 5.0     # X distance between the two poles in a pair
 const POLE_COLOR        := Color(0.16, 0.17, 0.20)  # same cool dark gray as rocks
+const POLE_ROUGHNESS    := 0.3     # pole material roughness
+const POLE_METALLIC     := 0.6     # pole material metallic
+const POLE_AREA_SIZE    := Vector3(0.55, 2.0, 0.55)  # crash box covering the lower shaft
+const POLE_AREA_CENTER_Y := 1.0    # height of the crash box center above the pole base
+const POLE_NEAR_RADIUS  := 1.8     # close-call sphere radius
 
 # Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
 const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
@@ -91,6 +101,8 @@ const SIGN_FACE_SIZE   := 0.55    # width/height of the diamond sign face
 const SIGN_FACE_THICK  := 0.05    # depth of the sign face
 const SIGN_COLOR       := Color(0.95, 0.82, 0.08)   # warning yellow
 const SIGN_POST_COLOR  := Color(0.80, 0.80, 0.80)   # light gray post
+const SIGN_POST_ROUGHNESS := 0.6  # post material roughness
+const SIGN_FACE_ROTATION_DEG := 45.0  # diamond orientation
 
 const TREE_TRUNK_RADIUS := 0.30    # how thick tree trunks are
 const TREE_TRUNK_HEIGHT := 2.4     # how tall the trunk is before foliage starts
@@ -99,6 +111,9 @@ const TREE_FOLIAGE_HEIGHT := 5.6   # how tall the foliage cone is
 const TREE_CLUSTER_SPREAD := 6.0   # how spread out trees are within a cluster
 const TREE_COLOR_FOLIAGE := Color(0.05, 0.28, 0.05)  # dark pine green
 const TREE_COLOR_TRUNK := Color(0.22, 0.12, 0.05)    # dark brown
+const TREE_RADIAL_SEGMENTS := 3    # trunk and foliage are triangular prisms/pyramids
+const TREE_AREA_PADDING := 0.15    # crash cylinder is this much wider than the trunk
+const TREE_NEAR_RADIUS := 2.0      # close-call sphere radius
 
 # Rails
 const RAIL_WIDTH_VISUAL := 0.25    # how wide the rail looks
@@ -109,6 +124,43 @@ const RAIL_LENGTH_MAX := 75.0      # longest possible rail (meters)
 const RAIL_PEAK_HEIGHT := 1.5      # how high the flat grinding section is above the ground
 const RAIL_RAMP_SECTION := 4.5     # length of the approach and exit ramps on each end
 const RAIL_RAMP_GAP := 0.1         # small gap between the ramp top and the flat section
+const RAIL_COLOR := Color(0.72, 0.72, 0.78)  # rail metal color
+const RAIL_METALLIC := 0.85        # rail material metallic
+const RAIL_ROUGHNESS := 0.15       # rail material roughness
+
+# Lap marker (red line across the floor at the end of each lap)
+const LAP_MARKER_COLOR := Color(1.0, 0.08, 0.08)
+const LAP_MARKER_HEIGHT := 0.02    # thickness of the marker
+const LAP_MARKER_DEPTH := 0.18     # how wide the marker stripe is along the slope
+
+# Shared-resource ids (one material/mesh/shape per id, reused by every obstacle)
+const MAT_SNOW      := &"snow"
+const MAT_SNOW_RAMP := &"snow_ramp"
+const MAT_RAIL      := &"rail"
+const MAT_SIGN_POST := &"sign_post"
+const MAT_SIGN_FACE := &"sign_face"
+const MAT_TRUNK     := &"trunk"
+const MAT_FOLIAGE   := &"foliage"
+const MAT_ROCK      := &"rock"
+const MAT_POLE      := &"pole"
+const MAT_LAP       := &"lap"
+const MESH_TRUNK      := &"trunk"
+const MESH_FOLIAGE    := &"foliage"
+const MESH_BUSH       := &"bush"
+const MESH_MOGUL      := &"mogul"
+const MESH_SIGN_POST  := &"sign_post"
+const MESH_SIGN_FACE  := &"sign_face"
+const MESH_POLE_SHAFT := &"pole_shaft"
+const MESH_POLE_BAR   := &"pole_bar"
+const MESH_ROCK_BODY  := &"rock_body"  # built at radius 1; scaled per crystal
+const MESH_ROCK_CAP   := &"rock_cap"   # built at radius 1; scaled per crystal
+const SHAPE_TREE_HIT  := &"tree_hit"
+const SHAPE_TREE_NEAR := &"tree_near"
+const SHAPE_BUSH_HIT  := &"bush_hit"
+const SHAPE_BUSH_NEAR := &"bush_near"
+const SHAPE_POLE_HIT  := &"pole_hit"
+const SHAPE_POLE_NEAR := &"pole_near"
+const SHAPE_MOGUL     := &"mogul"
 
 # ── Tutorial configs ───────────────────────────────────────────────────────────
 # Five hardcoded stages played in order. Each has a variant key (drives tilt + speed)
@@ -204,6 +256,16 @@ var _active_floor_width: float = FLOOR_WIDTH
 
 var _seen_lift_area: bool = false  # true once the player has entered the Lift Area
 
+# Obstacles waiting to be built, one (or a few) per frame; see _build_queued_obstacles
+var _build_queue: Array[Dictionary] = []
+
+# Shared resource caches (filled lazily, reused by every chunk)
+static var _materials: Dictionary = {}
+static var _meshes: Dictionary = {}
+static var _shapes: Dictionary = {}
+static var _box_meshes: Dictionary = {}   # keyed by size
+static var _box_shapes: Dictionary = {}   # keyed by size
+
 
 func _ready() -> void:
 	add_to_group("level_generator")
@@ -213,6 +275,7 @@ func _ready() -> void:
 	GameManager.game_started.connect(_reset)
 	for i in range(CHUNKS_AHEAD + 1):
 		_spawn_chunk()
+	_build_queued_obstacles(_build_queue.size())
 
 
 func _process(_delta: float) -> void:
@@ -223,6 +286,7 @@ func _process(_delta: float) -> void:
 
 	while _spawn_z > player.position.z - CHUNKS_AHEAD * CHUNK_LENGTH:
 		_spawn_chunk()
+	_build_queued_obstacles(OBSTACLE_BUILDS_PER_FRAME)
 
 	# Advance displayed level when player crosses a lap marker boundary
 	var player_chunk := int(-player.position.z / CHUNK_LENGTH)
@@ -252,10 +316,9 @@ func _process(_delta: float) -> void:
 				_seen_lift_area = true
 
 	var despawn_z := player.position.z + CHUNKS_BEHIND * CHUNK_LENGTH
-	for chunk in _active_chunks.duplicate():
-		if chunk.position.z > despawn_z:
-			_active_chunks.erase(chunk)
-			chunk.queue_free()
+	# Chunks are ordered oldest-first, so only the front can be stale; free at most one per frame
+	if not _active_chunks.is_empty() and _active_chunks[0].position.z > despawn_z:
+		_active_chunks.pop_front().queue_free()
 
 
 func _spawn_chunk() -> void:
@@ -326,6 +389,7 @@ func _make_chunk(cfg: Dictionary) -> Node3D:
 
 
 func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
+	# Rolls which obstacle goes in each slot now; the nodes themselves are built later, one per frame.
 	var z := -RAMP_MARGIN
 	while z > -(CHUNK_LENGTH - RAMP_MARGIN):
 		var roll := randf()
@@ -333,9 +397,29 @@ func _maybe_add_obstacles(root: Node3D, cfg: Dictionary) -> void:
 		for key: String in OBSTACLE_ORDER:
 			cumulative += cfg.get(key, 0.0)
 			if roll < cumulative:
-				_add_obstacle(root, key, z)
+				_build_queue.append({
+					"root": root, "key": key, "z": z,
+					"tilt": _active_tilt_angle, "floor_width": _active_floor_width,
+				})
 				break
 		z -= RAMP_SLOT_SPACING
+
+
+# Builds up to `count` queued obstacles using the tilt/width that were active when they were queued.
+func _build_queued_obstacles(count: int) -> void:
+	while count > 0 and not _build_queue.is_empty():
+		var job: Dictionary = _build_queue.pop_front()
+		var root: Node3D = job["root"]
+		if not is_instance_valid(root):
+			continue
+		count -= 1
+		var saved_tilt := _active_tilt_angle
+		var saved_width := _active_floor_width
+		_active_tilt_angle = job["tilt"]
+		_active_floor_width = job["floor_width"]
+		_add_obstacle(root, job["key"], job["z"])
+		_active_tilt_angle = saved_tilt
+		_active_floor_width = saved_width
 
 
 func _add_obstacle(root: Node3D, key: String, z: float) -> void:
@@ -379,6 +463,175 @@ func _add_obstacle(root: Node3D, key: String, z: float) -> void:
 			root.add_child(_make_warning_sign(Vector3(sx, 0.0, z)))
 
 
+# ── Shared resources ──────────────────────────────────────────────────────────
+
+static func _material(id: StringName) -> StandardMaterial3D:
+	if not _materials.has(id):
+		_materials[id] = _build_material(id)
+	return _materials[id]
+
+
+static func _build_material(id: StringName) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	match id:
+		MAT_SNOW, MAT_SNOW_RAMP:
+			mat.albedo_color = SNOW_COLOR
+			mat.roughness = SNOW_ROUGHNESS
+			if id == MAT_SNOW_RAMP:
+				mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		MAT_RAIL:
+			mat.albedo_color = RAIL_COLOR
+			mat.metallic = RAIL_METALLIC
+			mat.roughness = RAIL_ROUGHNESS
+		MAT_SIGN_POST:
+			mat.albedo_color = SIGN_POST_COLOR
+			mat.roughness = SIGN_POST_ROUGHNESS
+		MAT_SIGN_FACE:
+			mat.albedo_color = SIGN_COLOR
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		MAT_TRUNK:
+			mat.albedo_color = TREE_COLOR_TRUNK
+		MAT_FOLIAGE:
+			mat.albedo_color = TREE_COLOR_FOLIAGE
+		MAT_ROCK:
+			mat.albedo_color = ROCK_COLOR
+			mat.roughness = ROCK_ROUGHNESS
+			mat.metallic = 0.0
+		MAT_POLE:
+			mat.albedo_color = POLE_COLOR
+			mat.roughness = POLE_ROUGHNESS
+			mat.metallic = POLE_METALLIC
+		MAT_LAP:
+			mat.albedo_color = LAP_MARKER_COLOR
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return mat
+
+
+static func _mesh(id: StringName) -> Mesh:
+	if not _meshes.has(id):
+		_meshes[id] = _build_mesh(id)
+	return _meshes[id]
+
+
+static func _build_mesh(id: StringName) -> Mesh:
+	match id:
+		MESH_TRUNK:
+			return _make_cylinder_mesh(TREE_TRUNK_RADIUS, TREE_TRUNK_RADIUS, TREE_TRUNK_HEIGHT, TREE_RADIAL_SEGMENTS)
+		MESH_FOLIAGE:
+			return _make_cylinder_mesh(0.0, TREE_FOLIAGE_RADIUS, TREE_FOLIAGE_HEIGHT, TREE_RADIAL_SEGMENTS)
+		MESH_BUSH:
+			return _make_bush_mesh()
+		MESH_MOGUL:
+			return _make_mogul_mesh(MOGUL_BASE, MOGUL_HEIGHT, MOGUL_SINK)
+		MESH_SIGN_POST:
+			return _make_box_mesh(Vector3(SIGN_POST_WIDTH, SIGN_POST_HEIGHT, SIGN_POST_WIDTH))
+		MESH_SIGN_FACE:
+			return _make_box_mesh(Vector3(SIGN_FACE_SIZE, SIGN_FACE_SIZE, SIGN_FACE_THICK))
+		MESH_POLE_SHAFT:
+			return _make_box_mesh(Vector3(POLE_SHAFT_WIDTH, POLE_SHAFT_HEIGHT, POLE_SHAFT_WIDTH))
+		MESH_POLE_BAR:
+			return _make_box_mesh(Vector3(POLE_BAR_LENGTH, POLE_BAR_HEIGHT, POLE_BAR_DEPTH))
+		MESH_ROCK_BODY:
+			return _make_cylinder_mesh(1.0, 1.0, ROCK_BODY_HEIGHT_FACTOR, ROCK_SEGMENTS)
+		MESH_ROCK_CAP:
+			return _make_cylinder_mesh(0.0, 1.0, ROCK_CAP_HEIGHT_FACTOR, ROCK_SEGMENTS)
+	return null
+
+
+static func _make_cylinder_mesh(top_radius: float, bottom_radius: float, height: float, segments: int) -> CylinderMesh:
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = top_radius
+	cyl.bottom_radius = bottom_radius
+	cyl.height = height
+	cyl.radial_segments = segments
+	return cyl
+
+
+static func _make_box_mesh(size: Vector3) -> BoxMesh:
+	var box := BoxMesh.new()
+	box.size = size
+	return box
+
+
+static func _box_mesh(size: Vector3) -> BoxMesh:
+	if not _box_meshes.has(size):
+		_box_meshes[size] = _make_box_mesh(size)
+	return _box_meshes[size]
+
+
+static func _box_shape(size: Vector3) -> BoxShape3D:
+	if not _box_shapes.has(size):
+		var shape := BoxShape3D.new()
+		shape.size = size
+		_box_shapes[size] = shape
+	return _box_shapes[size]
+
+
+static func _shape(id: StringName) -> Shape3D:
+	if not _shapes.has(id):
+		_shapes[id] = _build_shape(id)
+	return _shapes[id]
+
+
+static func _build_shape(id: StringName) -> Shape3D:
+	match id:
+		SHAPE_TREE_HIT:
+			return _make_cylinder_shape(TREE_TRUNK_RADIUS + TREE_AREA_PADDING, TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT)
+		SHAPE_TREE_NEAR:
+			return _make_sphere_shape(TREE_NEAR_RADIUS)
+		SHAPE_BUSH_HIT:
+			return _make_cylinder_shape(BUSH_RADIUS * BUSH_AREA_RADIUS_FACTOR, BUSH_HEIGHT)
+		SHAPE_BUSH_NEAR:
+			return _make_sphere_shape(BUSH_NEAR_RADIUS)
+		SHAPE_POLE_HIT:
+			var box := BoxShape3D.new()
+			box.size = POLE_AREA_SIZE
+			return box
+		SHAPE_POLE_NEAR:
+			return _make_sphere_shape(POLE_NEAR_RADIUS)
+		SHAPE_MOGUL:
+			var convex := ConvexPolygonShape3D.new()
+			convex.points = PackedVector3Array([
+				Vector3(-MOGUL_BASE, -MOGUL_SINK,  MOGUL_BASE),
+				Vector3( MOGUL_BASE, -MOGUL_SINK,  MOGUL_BASE),
+				Vector3(-MOGUL_BASE, -MOGUL_SINK, -MOGUL_BASE),
+				Vector3( MOGUL_BASE, -MOGUL_SINK, -MOGUL_BASE),
+				Vector3( 0.0,         MOGUL_HEIGHT, 0.0),
+			])
+			return convex
+	return null
+
+
+static func _make_cylinder_shape(radius: float, height: float) -> CylinderShape3D:
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	return shape
+
+
+static func _make_sphere_shape(radius: float) -> SphereShape3D:
+	var shape := SphereShape3D.new()
+	shape.radius = radius
+	return shape
+
+
+# Wraps a shape in a CollisionShape3D raised to `y`.
+func _make_collision(shape: Shape3D, y: float) -> CollisionShape3D:
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	col.position.y = y
+	return col
+
+
+# Kill zone that watches Jerry (layer 1) and AI riders (layer 2). It is never itself a detection target.
+func _make_hit_area(shape: Shape3D, y: float) -> Area3D:
+	var area := Area3D.new()
+	area.collision_layer = 0
+	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
+	area.add_child(_make_collision(shape, y))
+	return area
+
+
 func _make_ramp(origin: Vector3, angle: float, length: float, width: float = RAMP_WIDTH) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = origin  # y=0, sits on floor
@@ -405,11 +658,7 @@ func _make_ramp(origin: Vector3, angle: float, length: float, width: float = RAM
 	# Visual: triangular prism
 	var mesh_inst := MeshInstance3D.new()
 	mesh_inst.mesh = _make_ramp_visual(w, l, h, angle)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = SNOW_COLOR
-	mat.roughness = SNOW_ROUGHNESS
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mesh_inst.material_override = mat
+	mesh_inst.material_override = _material(MAT_SNOW_RAMP)
 	body.add_child(mesh_inst)
 
 	return body
@@ -513,10 +762,7 @@ func _make_rail(origin: Vector3, length: float) -> StaticBody3D:
 
 	# ── Visuals ───────────────────────────────────────────────────────────────
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.72, 0.72, 0.78)
-	mat.metallic = 0.85
-	mat.roughness = 0.15
+	var mat := _material(MAT_RAIL)
 
 	# On-ramp: center Z simplifies to (length - ramp_len) * 0.5 regardless of gap
 	var on_mesh := MeshInstance3D.new()
@@ -568,34 +814,17 @@ func _make_mogul(pos: Vector3) -> StaticBody3D:
 	body.position = pos
 	body.add_to_group("snow_terrain")
 
-	var b := MOGUL_BASE
-	var h := MOGUL_HEIGHT
-	var g := MOGUL_SINK
-
-	var col := CollisionShape3D.new()
-	var shape := ConvexPolygonShape3D.new()
-	shape.points = PackedVector3Array([
-		Vector3(-b, -g,  b),
-		Vector3( b, -g,  b),
-		Vector3(-b, -g, -b),
-		Vector3( b, -g, -b),
-		Vector3( 0,  h,  0),
-	])
-	col.shape = shape
-	body.add_child(col)
+	body.add_child(_make_collision(_shape(SHAPE_MOGUL), 0.0))
 
 	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = _make_mogul_mesh(b, h, g)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = SNOW_COLOR
-	mat.roughness = SNOW_ROUGHNESS
-	mesh_inst.material_override = mat
+	mesh_inst.mesh = _mesh(MESH_MOGUL)
+	mesh_inst.material_override = _material(MAT_SNOW)
 	body.add_child(mesh_inst)
 
 	return body
 
 
-func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
+static func _make_mogul_mesh(b: float, h: float, g: float) -> ArrayMesh:
 	var apex := Vector3( 0,  h,  0)
 	var fl   := Vector3(-b, -g,  b)
 	var fr   := Vector3( b, -g,  b)
@@ -635,36 +864,24 @@ func _make_warning_sign(pos: Vector3) -> Node3D:
 	root.position = pos
 	root.rotation_degrees.x = _active_tilt_angle
 
-	var post_mat := StandardMaterial3D.new()
-	post_mat.albedo_color = SIGN_POST_COLOR
-	post_mat.roughness = 0.6
-
 	var post := MeshInstance3D.new()
-	var post_box := BoxMesh.new()
-	post_box.size = Vector3(SIGN_POST_WIDTH, SIGN_POST_HEIGHT, SIGN_POST_WIDTH)
-	post.mesh = post_box
-	post.material_override = post_mat
+	post.mesh = _mesh(MESH_SIGN_POST)
+	post.material_override = _material(MAT_SIGN_POST)
 	post.position.y = SIGN_POST_HEIGHT * 0.5
 	root.add_child(post)
 
-	var sign_mat := StandardMaterial3D.new()
-	sign_mat.albedo_color = SIGN_COLOR
-	sign_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-
 	var face := MeshInstance3D.new()
-	var face_box := BoxMesh.new()
-	face_box.size = Vector3(SIGN_FACE_SIZE, SIGN_FACE_SIZE, SIGN_FACE_THICK)
-	face.mesh = face_box
-	face.material_override = sign_mat
+	face.mesh = _mesh(MESH_SIGN_FACE)
+	face.material_override = _material(MAT_SIGN_FACE)
 	face.position.y = SIGN_POST_HEIGHT + SIGN_FACE_SIZE * 0.5
-	face.rotation_degrees.z = 45.0  # diamond orientation
+	face.rotation_degrees.z = SIGN_FACE_ROTATION_DEG
 	root.add_child(face)
 
 	return root
 
 
 # Connects crash detection to hit_area and adds a proximity sphere for close-call scoring.
-func _attach_near_miss(root: Node3D, hit_area: Area3D, near_radius: float, near_y: float) -> void:
+func _attach_near_miss(root: Node3D, hit_area: Area3D, near_shape: Shape3D, near_y: float) -> void:
 	var hit := [false]
 	hit_area.body_entered.connect(func(body: Node3D) -> void:
 		if body.has_method("crash"):
@@ -672,13 +889,9 @@ func _attach_near_miss(root: Node3D, hit_area: Area3D, near_radius: float, near_
 			body.crash()
 	)
 	var near := Area3D.new()
-	var col := CollisionShape3D.new()
-	var sphere := SphereShape3D.new()
-	sphere.radius = near_radius
-	col.shape = sphere
-	col.position.y = near_y
-	near.add_child(col)
+	near.collision_layer = 0
 	near.collision_mask = 1  # player only
+	near.add_child(_make_collision(near_shape, near_y))
 	near.body_entered.connect(func(body: Node3D) -> void:
 		if body.is_in_group("player"): hit[0] = false
 	)
@@ -708,44 +921,23 @@ func _make_tree(pos: Vector3) -> Node3D:
 	root.rotation_degrees.x = _active_tilt_angle
 
 	# Trunk — skinny triangular prism
-	var trunk_mat := StandardMaterial3D.new()
-	trunk_mat.albedo_color = TREE_COLOR_TRUNK
-	var trunk_cyl := CylinderMesh.new()
-	trunk_cyl.top_radius = TREE_TRUNK_RADIUS
-	trunk_cyl.bottom_radius = TREE_TRUNK_RADIUS
-	trunk_cyl.height = TREE_TRUNK_HEIGHT
-	trunk_cyl.radial_segments = 3
 	var trunk_mesh := MeshInstance3D.new()
-	trunk_mesh.mesh = trunk_cyl
-	trunk_mesh.material_override = trunk_mat
+	trunk_mesh.mesh = _mesh(MESH_TRUNK)
+	trunk_mesh.material_override = _material(MAT_TRUNK)
 	trunk_mesh.position.y = TREE_TRUNK_HEIGHT * 0.5
 	root.add_child(trunk_mesh)
 
-	# Foliage — pointy triangular pyramid (top_radius = 0)
-	var foliage_mat := StandardMaterial3D.new()
-	foliage_mat.albedo_color = TREE_COLOR_FOLIAGE
-	var foliage_cyl := CylinderMesh.new()
-	foliage_cyl.top_radius = 0.0
-	foliage_cyl.bottom_radius = TREE_FOLIAGE_RADIUS
-	foliage_cyl.height = TREE_FOLIAGE_HEIGHT
-	foliage_cyl.radial_segments = 3
+	# Foliage — pointy triangular pyramid
 	var foliage_mesh := MeshInstance3D.new()
-	foliage_mesh.mesh = foliage_cyl
-	foliage_mesh.material_override = foliage_mat
+	foliage_mesh.mesh = _mesh(MESH_FOLIAGE)
+	foliage_mesh.material_override = _material(MAT_FOLIAGE)
 	foliage_mesh.position.y = TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT * 0.5
 	root.add_child(foliage_mesh)
 
 	# Crash area — covers the whole tree height
-	var area := Area3D.new()
-	var area_col := CollisionShape3D.new()
-	var area_shape := CylinderShape3D.new()
-	area_shape.radius = TREE_TRUNK_RADIUS + 0.15
-	area_shape.height = TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT
-	area_col.shape = area_shape
-	area_col.position.y = (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5
-	area.add_child(area_col)
-	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	_attach_near_miss(root, area, 2.0, (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5)
+	var center_y := (TREE_TRUNK_HEIGHT + TREE_FOLIAGE_HEIGHT) * 0.5
+	var area := _make_hit_area(_shape(SHAPE_TREE_HIT), center_y)
+	_attach_near_miss(root, area, _shape(SHAPE_TREE_NEAR), center_y)
 	root.add_child(area)
 
 	return root
@@ -767,28 +959,18 @@ func _make_bush(pos: Vector3) -> Node3D:
 	root.position = pos
 
 	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = _make_bush_mesh()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = TREE_COLOR_FOLIAGE
-	mesh_inst.material_override = mat
+	mesh_inst.mesh = _mesh(MESH_BUSH)
+	mesh_inst.material_override = _material(MAT_FOLIAGE)
 	root.add_child(mesh_inst)
 
-	var area := Area3D.new()
-	var area_col := CollisionShape3D.new()
-	var area_shape := CylinderShape3D.new()
-	area_shape.radius = BUSH_RADIUS * 0.85
-	area_shape.height = BUSH_HEIGHT
-	area_col.shape = area_shape
-	area_col.position.y = BUSH_HEIGHT * 0.5
-	area.add_child(area_col)
-	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	_attach_near_miss(root, area, 2.2, BUSH_HEIGHT * 0.5)
+	var area := _make_hit_area(_shape(SHAPE_BUSH_HIT), BUSH_HEIGHT * 0.5)
+	_attach_near_miss(root, area, _shape(SHAPE_BUSH_NEAR), BUSH_HEIGHT * 0.5)
 	root.add_child(area)
 
 	return root
 
 
-func _make_bush_mesh() -> ArrayMesh:
+static func _make_bush_mesh() -> ArrayMesh:
 	var t := (1.0 + sqrt(5.0)) / 2.0   # golden ratio
 	var cr := sqrt(1.0 + t * t)         # icosahedron circumradius
 
@@ -864,47 +1046,28 @@ func _make_rock_crystal(pos: Vector3) -> Node3D:
 	var radius  := randf_range(ROCK_RADIUS_MIN, ROCK_RADIUS_MAX)
 	var body_h  := radius * ROCK_BODY_HEIGHT_FACTOR
 	var cap_h   := radius * ROCK_CAP_HEIGHT_FACTOR
+	var rock_mat := _material(MAT_ROCK)
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = ROCK_COLOR
-	mat.roughness = 0.90
-	mat.metallic = 0.0
-
-	# Hexagonal prism body
-	var body_cyl := CylinderMesh.new()
-	body_cyl.top_radius = radius
-	body_cyl.bottom_radius = radius
-	body_cyl.height = body_h
-	body_cyl.radial_segments = ROCK_SEGMENTS
+	# Hexagonal prism body (shared unit-radius mesh, scaled uniformly to this crystal's radius)
 	var body_mesh := MeshInstance3D.new()
-	body_mesh.mesh = body_cyl
-	body_mesh.material_override = mat
+	body_mesh.mesh = _mesh(MESH_ROCK_BODY)
+	body_mesh.material_override = rock_mat
+	body_mesh.scale = Vector3.ONE * radius
 	body_mesh.position.y = body_h * 0.5 - ROCK_SINK
 	root.add_child(body_mesh)
 
 	# Pointed cap
-	var cap_cyl := CylinderMesh.new()
-	cap_cyl.top_radius = 0.0
-	cap_cyl.bottom_radius = radius
-	cap_cyl.height = cap_h
-	cap_cyl.radial_segments = ROCK_SEGMENTS
 	var cap_mesh := MeshInstance3D.new()
-	cap_mesh.mesh = cap_cyl
-	cap_mesh.material_override = mat
+	cap_mesh.mesh = _mesh(MESH_ROCK_CAP)
+	cap_mesh.material_override = rock_mat
+	cap_mesh.scale = Vector3.ONE * radius
 	cap_mesh.position.y = body_h + cap_h * 0.5 - ROCK_SINK
 	root.add_child(cap_mesh)
 
-	# Crash area
-	var area := Area3D.new()
-	var area_col := CollisionShape3D.new()
-	var area_shape := CylinderShape3D.new()
-	area_shape.radius = radius
-	area_shape.height = body_h + cap_h
-	area_col.shape = area_shape
-	area_col.position.y = (body_h + cap_h) * 0.5 - ROCK_SINK
-	area.add_child(area_col)
-	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	_attach_near_miss(root, area, radius + 1.5, (body_h + cap_h) * 0.5 - ROCK_SINK)
+	# Crash area (radius varies per crystal, so these shapes are not shared)
+	var center_y := (body_h + cap_h) * 0.5 - ROCK_SINK
+	var area := _make_hit_area(_make_cylinder_shape(radius, body_h + cap_h), center_y)
+	_attach_near_miss(root, area, _make_sphere_shape(radius + ROCK_NEAR_PADDING), center_y)
 	root.add_child(area)
 
 	return root
@@ -922,40 +1085,26 @@ func _make_pole(pos: Vector3) -> Node3D:
 	var root := Node3D.new()
 	root.position = pos
 	root.rotation_degrees.x = _active_tilt_angle
-
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = POLE_COLOR
-	mat.roughness = 0.3
-	mat.metallic = 0.6
+	var pole_mat := _material(MAT_POLE)
 
 	# Vertical shaft
 	var shaft_mesh := MeshInstance3D.new()
-	var shaft_box := BoxMesh.new()
-	shaft_box.size = Vector3(POLE_SHAFT_WIDTH, POLE_SHAFT_HEIGHT, POLE_SHAFT_WIDTH)
-	shaft_mesh.mesh = shaft_box
-	shaft_mesh.material_override = mat
+	shaft_mesh.mesh = _mesh(MESH_POLE_SHAFT)
+	shaft_mesh.material_override = pole_mat
 	shaft_mesh.position.y = POLE_SHAFT_HEIGHT * 0.5 - POLE_SINK
 	root.add_child(shaft_mesh)
 
 	# Horizontal crossbar at top
 	var bar_mesh := MeshInstance3D.new()
-	var bar_box := BoxMesh.new()
-	bar_box.size = Vector3(POLE_BAR_LENGTH, POLE_BAR_HEIGHT, POLE_BAR_DEPTH)
-	bar_mesh.mesh = bar_box
-	bar_mesh.material_override = mat
+	bar_mesh.mesh = _mesh(MESH_POLE_BAR)
+	bar_mesh.material_override = pole_mat
 	bar_mesh.position.y = POLE_SHAFT_HEIGHT - POLE_SINK
 	root.add_child(bar_mesh)
 
 	# Crash area — box covering the lower portion of the shaft where riders pass through
-	var area := Area3D.new()
-	var area_col := CollisionShape3D.new()
-	var area_shape := BoxShape3D.new()
-	area_shape.size = Vector3(0.55, 2.0, 0.55)
-	area_col.shape = area_shape
-	area_col.position.y = 1.0 - POLE_SINK
-	area.add_child(area_col)
-	area.collision_mask = 3  # layer 1 (Jerry) + layer 2 (AI riders)
-	_attach_near_miss(root, area, 1.8, 1.0 - POLE_SINK)
+	var area_y := POLE_AREA_CENTER_Y - POLE_SINK
+	var area := _make_hit_area(_shape(SHAPE_POLE_HIT), area_y)
+	_attach_near_miss(root, area, _shape(SHAPE_POLE_NEAR), area_y)
 	root.add_child(area)
 
 	return root
@@ -963,14 +1112,9 @@ func _make_pole(pos: Vector3) -> Node3D:
 
 func _make_lap_marker() -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(_active_floor_width, 0.02, 0.18)
-	mi.mesh = box
-	mi.position = Vector3(0.0, 0.02, -(CHUNK_LENGTH - 0.09))
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.08, 0.08)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mi.material_override = mat
+	mi.mesh = _box_mesh(Vector3(_active_floor_width, LAP_MARKER_HEIGHT, LAP_MARKER_DEPTH))
+	mi.position = Vector3(0.0, LAP_MARKER_HEIGHT, -(CHUNK_LENGTH - LAP_MARKER_DEPTH * 0.5))
+	mi.material_override = _material(MAT_LAP)
 	return mi
 
 
@@ -982,20 +1126,13 @@ func _make_panel(pos: Vector3, rot_z: float, size: Vector3, is_snow_terrain: boo
 		body.add_to_group("snow_terrain")
 
 	var mesh_inst := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh_inst.mesh = box
+	mesh_inst.mesh = _box_mesh(size)
 	if is_snow_terrain:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = SNOW_COLOR
-		mat.roughness = SNOW_ROUGHNESS
-		mesh_inst.material_override = mat
+		mesh_inst.material_override = _material(MAT_SNOW)
 	body.add_child(mesh_inst)
 
 	var col := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = size
-	col.shape = shape
+	col.shape = _box_shape(size)
 	body.add_child(col)
 
 	return body
@@ -1034,6 +1171,7 @@ func _on_state_changed(_new_state: GameManager.State) -> void:
 
 
 func _reset() -> void:
+	_build_queue.clear()
 	for chunk in _active_chunks:
 		chunk.queue_free()
 	_active_chunks.clear()
@@ -1050,10 +1188,12 @@ func _reset() -> void:
 		GameManager.set_variant(variant)
 		for i in range(CHUNKS_AHEAD + 1):
 			_spawn_chunk()
+		_build_queued_obstacles(_build_queue.size())
 		level_changed.emit(TUTORIAL_LEVELS[0]["name"], 1)
 		tutorial_stage_changed.emit(0)
 	else:
 		_pick_variant()
 		for i in range(CHUNKS_AHEAD + 1):
 			_spawn_chunk()
+		_build_queued_obstacles(_build_queue.size())
 		level_changed.emit(_make_display_name(LEVELS[0]["name"]), 1)
