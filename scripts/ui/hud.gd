@@ -11,7 +11,7 @@ extends CanvasLayer
 @onready var _pause_screen: Control = $PauseScreen
 
 const Mannequin = preload("res://scripts/ui/mannequin.gd")
-const MANNEQUIN_LAYER := 3   # above the posterize CanvasLayer (layer 2) so the widget stays crisp
+const ABOVE_POSTERIZE_LAYER := 3   # above the posterize CanvasLayer (layer 2): mannequin + lodge stay uncrunched
 
 const SCREEN_OVERLAY_COLOR := Color(0.15, 0.15, 0.15, 0.3)
 
@@ -129,9 +129,6 @@ const SWATCH_SIZE := Vector2(52.0, 52.0)
 const SWATCH_SEPARATION := 10
 const SWATCH_CORNER_RADIUS := 3
 const SWATCH_SELECTED_BORDER := 3
-const SWATCH_HOVER_BORDER := 2
-const SWATCH_HOVER_LIGHTEN := 0.15
-const SWATCH_HOVER_BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.7)
 const SWATCH_TEXTURE_BG := Color(0.06, 0.06, 0.10)  # behind goggle/board thumbnails
 
 # Wobble: sine frequency (rad/s) and amplitude (px) per axis
@@ -325,10 +322,11 @@ func _ready() -> void:
 	add_child(_close_call_label)
 
 	_player = get_tree().get_first_node_in_group("player")
-	var mannequin_layer := CanvasLayer.new()
-	mannequin_layer.layer = MANNEQUIN_LAYER
-	add_child(mannequin_layer)
-	mannequin_layer.add_child(Mannequin.new())  # finds the player via the "player" group
+	var clean_layer := CanvasLayer.new()
+	clean_layer.layer = ABOVE_POSTERIZE_LAYER
+	add_child(clean_layer)
+	clean_layer.add_child(Mannequin.new())  # finds the player via the "player" group
+	_customize_screen.reparent(clean_layer)  # lodge swatches/preview must show true colours
 	if _player:
 		_player.stance_changed.connect(_on_stance_changed)
 		_player.wipeout_danger.connect(_on_wipeout_danger)
@@ -750,17 +748,14 @@ func _make_swatch_button(color: Color, selected: bool, texture: Texture2D = null
 	normal.set_border_width_all(SWATCH_SELECTED_BORDER if selected else 0)
 	normal.border_color = Color.WHITE
 
-	var hover := StyleBoxFlat.new()
-	hover.bg_color = color.lightened(SWATCH_HOVER_LIGHTEN)
-	hover.set_corner_radius_all(SWATCH_CORNER_RADIUS)
-	hover.set_border_width_all(SWATCH_HOVER_BORDER)
-	hover.border_color = SWATCH_HOVER_BORDER_COLOR
-
 	# Focus is drawn on top of "normal"; an opaque focus box hid the clicked swatch's selection border
 	var focus := StyleBoxEmpty.new()
 
 	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
+	# Hover reuses "normal": a lightened hover box lingered after a click (mouse still over it) and,
+	# once posterized, read as a different colour. A swatch always shows its true colour + selection border.
+	btn.add_theme_stylebox_override("hover", normal)
+	btn.add_theme_stylebox_override("hover_pressed", normal)
 	btn.add_theme_stylebox_override("pressed", normal)
 	btn.add_theme_stylebox_override("focus", focus)
 

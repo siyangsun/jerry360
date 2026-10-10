@@ -17,8 +17,8 @@ const JACKET_COLORS: Array[Color] = [
 	Color(0.42, 0.12, 0.55),  # bruise
 ]
 const HELMET_COLORS: Array[Color] = [
-	Color(0.80, 0.78, 0.73),  # chalk
 	Color(0.26, 0.27, 0.29),  # graphite
+	Color(0.70, 0.72, 0.74),  # fog
 	Color(0.40, 0.42, 0.32),  # olive
 	Color(0.24, 0.30, 0.40),  # slate
 ]
