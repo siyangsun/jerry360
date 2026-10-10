@@ -12,6 +12,18 @@ extends CanvasLayer
 
 const SCREEN_OVERLAY_COLOR := Color(0.15, 0.15, 0.15, 0.3)
 
+# Palette
+const COLOR_GOLD := Color(1.0, 0.82, 0.1, 1.0)
+const COLOR_ORANGE := Color(1.0, 0.45, 0.05, 1.0)
+const COLOR_NOW_PLAYING := Color(1.0, 1.0, 1.0, 0.5)
+const COLOR_SKIP := Color(1.0, 1.0, 1.0, 0.65)
+const COLOR_SKIP_HOVER := Color(1.0, 1.0, 1.0, 1.0)
+const COLOR_SKIP_PRESSED := Color(1.0, 1.0, 1.0, 0.4)
+const COLOR_AFTERNOON := Color(1.0, 1.0, 1.0, 0.75)
+const COLOR_PREVIEW_LABEL := Color(1.0, 1.0, 1.0, 0.4)
+const COLOR_PREVIEW_PANEL := Color(0.06, 0.06, 0.10)
+const COLOR_VIGNETTE := Color(1.0, 0.0, 0.0, 0.0)
+
 const JERRY_COLORS: Array[Color] = [
 	Color(1.0, 0.45, 0.05),   # burnt orange (default)
 	Color(0.12, 0.22, 0.75),  # navy
@@ -42,6 +54,106 @@ const LAP_DISTANCE := 1000.0
 const WIFE_CALL_TEXT := "Hi honey, are you having fun?"
 const WIFE_KILL_TEXT := "No? Aww, I'm sorry. Come home whenever you get the chance!"
 
+const CLOSE_CALL_DISPLAY_TIME := 2.5
+const TRICK_DISPLAY_TIME := 2.5
+const CLOSE_CALL_PHRASES := [
+	"close one!",
+	"could almost touch it",
+	"yikes, barely snuck by there",
+	"whoa, that was close",
+]
+
+# Font names
+const SERIF_FONT_NAMES := ["Georgia", "Times New Roman", "Times", "serif"]
+const TRICK_FONT_NAMES := ["Georgia", "Times New Roman", "serif"]
+const MONO_FONT_NAMES := ["Consolas", "Courier New", "monospace"]
+
+# Font sizes
+const FONT_SIZE_LEVEL := 18
+const FONT_SIZE_COMBO := 24
+const FONT_SIZE_BANNER := 64        # GOOFY, WOOHOO
+const FONT_SIZE_CALLOUT := 28       # danger, nice air, trick
+const FONT_SIZE_NOW_PLAYING := 17
+const FONT_SIZE_SKIP := 21
+const FONT_SIZE_WOW := 18
+const FONT_SIZE_WIFE := 20
+const FONT_SIZE_FUN_HAD := 18
+const FONT_SIZE_TUTORIAL := 16
+const FONT_SIZE_AFTERNOON := 14
+const FONT_SIZE_CLOSE_CALL := 22
+const FONT_SIZE_CONTROLS_TITLE := 48
+const FONT_SIZE_CONTROLS_ROW := 16
+const FONT_SIZE_CUSTOMIZE_TITLE := 36
+const FONT_SIZE_CUSTOMIZE_SECTION := 18
+const FONT_SIZE_PREVIEW := 13
+
+# Layout: anchors are Vector4(left, top, right, bottom); offsets use the same order
+const LEVEL_POSITION := Vector2(8.0, 8.0)
+const COMBO_TOP_Y := 16.0
+const DANGER_TOP_Y := 48.0
+const GOOFY_ANCHORS := Vector4(0.5, 0.0, 0.5, 0.0)
+const GOOFY_OFFSETS := Vector4(-400.0, 60.0, 400.0, 140.0)
+const NOW_PLAYING_ANCHORS := Vector4(1.0, 0.0, 1.0, 0.0)
+const NOW_PLAYING_OFFSETS := Vector4(-206.0, 8.0, -8.0, 50.0)
+const SKIP_ANCHORS := Vector4(1.0, 0.0, 1.0, 0.0)
+const SKIP_OFFSETS := Vector4(-116.0, 62.0, -8.0, 95.0)
+const WIFE_ANCHORS := Vector4(1.0, 0.5, 1.0, 0.5)
+const WIFE_OFFSETS := Vector4(-316.0, -40.0, -16.0, 40.0)
+const WOOHOO_ANCHORS := Vector4(0.0, 0.35, 1.0, 0.55)
+const NICE_AIR_ANCHORS := Vector4(0.5, 0.5, 0.5, 0.5)
+const NICE_AIR_OFFSETS := Vector4(-100.0, -20.0, 100.0, 20.0)
+const TRICK_ANCHORS := Vector4(1.0, 1.0, 1.0, 1.0)
+const TRICK_OFFSETS := Vector4(-347.0, -105.0, -12.0, -55.0)
+const FUN_HAD_ANCHORS := Vector4(1.0, 1.0, 1.0, 1.0)
+const FUN_HAD_OFFSETS := Vector4(-347.0, -50.0, -12.0, -12.0)
+const TUTORIAL_ANCHORS := Vector4(0.1, 0.82, 0.9, 0.95)
+const AFTERNOON_ANCHORS := Vector4(0.1, 0.88, 0.9, 0.96)
+const CLOSE_CALL_ANCHORS := Vector4(0.0, 0.5, 0.5, 0.5)
+const CLOSE_CALL_OFFSETS := Vector4(18.0, -16.0, 300.0, 16.0)
+
+const CONTROLS_TITLE_ANCHORS := Vector4(0.0, 0.06, 1.0, 0.18)
+const CONTROLS_LIST_ANCHORS := Vector4(0.1, 0.20, 0.9, 0.85)
+const CONTROLS_BACK_ANCHORS := Vector4(0.38, 0.88, 0.62, 0.96)
+const CONTROLS_LIST_SEPARATION := 10
+const CONTROLS_KEY_COLUMN_WIDTH := 160.0
+
+const CUSTOMIZE_TITLE_ANCHORS := Vector4(0.04, 0.04, 0.56, 0.16)
+const CUSTOMIZE_JERRY_LABEL_ANCHORS := Vector4(0.04, 0.20, 0.56, 0.30)
+const CUSTOMIZE_JERRY_ROW_ANCHORS := Vector4(0.04, 0.31, 0.56, 0.46)
+const CUSTOMIZE_BOARD_LABEL_ANCHORS := Vector4(0.04, 0.50, 0.56, 0.60)
+const CUSTOMIZE_BOARD_ROW_ANCHORS := Vector4(0.04, 0.61, 0.56, 0.76)
+const CUSTOMIZE_BACK_ANCHORS := Vector4(0.04, 0.88, 0.22, 0.96)
+const PREVIEW_PANEL_ANCHORS := Vector4(0.62, 0.10, 0.96, 0.86)
+const PREVIEW_LABEL_ANCHORS := Vector4(0.0, 0.04, 1.0, 0.14)
+const PREVIEW_PANEL_CORNER_RADIUS := 4
+const PREVIEW_BODY_OFFSETS := Vector4(-28.0, -75.0, 28.0, 35.0)
+const PREVIEW_BOARD_OFFSETS := Vector4(-52.0, 42.0, 52.0, 55.0)
+const CENTER_ANCHORS := Vector4(0.5, 0.5, 0.5, 0.5)
+
+# Swatches
+const SWATCH_SIZE := Vector2(52.0, 52.0)
+const SWATCH_SEPARATION := 10
+const SWATCH_CORNER_RADIUS := 3
+const SWATCH_SELECTED_BORDER := 3
+const SWATCH_HOVER_BORDER := 2
+const SWATCH_HOVER_LIGHTEN := 0.15
+const SWATCH_HOVER_BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.7)
+
+# Wobble: sine frequency (rad/s) and amplitude (px) per axis
+const GOOFY_WOBBLE_FREQ := Vector2(27.0, 19.0)
+const GOOFY_WOBBLE_AMP := Vector2(6.0, 4.0)
+const NICE_AIR_WOBBLE_FREQ := Vector2(31.0, 23.0)
+const NICE_AIR_WOBBLE_AMP := Vector2(5.0, 4.0)
+const CLOSE_CALL_WOBBLE_FREQ := Vector2(29.0, 17.0)
+const CLOSE_CALL_WOBBLE_AMP := Vector2(4.0, 3.0)
+
+# Wipeout danger display
+const DANGER_MIN_INTENSITY := 0.25
+const DANGER_VIGNETTE_MAX_ALPHA := 0.18
+
+# Wow label floats above the player (world-space offset)
+const WOW_WORLD_OFFSET := Vector3(0.0, 2.5, 0.0)
+
 var _elapsed: float = 0.0
 var _lap_time: float = 0.0
 var _best_lap: float = INF
@@ -63,7 +175,6 @@ var _nice_air_label: Label
 var _nice_air_time: float = 0.0
 var _trick_label: Label
 var _trick_label_timer: float = 0.0
-var _trick_jiggle_time: float = 0.0
 var _fun_had_label: Label
 var _player: Node
 var _level_label: Label
@@ -95,14 +206,6 @@ var _close_call_label: Label
 var _close_call_timer: float = 0.0
 var _close_call_wobble_time: float = 0.0
 
-const CLOSE_CALL_DISPLAY_TIME := 2.5
-const CLOSE_CALL_PHRASES := [
-	"close one!",
-	"could almost touch it",
-	"yikes, barely snuck by there",
-	"whoa, that was close",
-]
-
 @export var fun_rate_wow_threshold: float = 20.0
 @export var wow_display_time: float = 3.0
 @export var wife_call_display_time: float = 3.5
@@ -114,123 +217,66 @@ const CLOSE_CALL_PHRASES := [
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_level_label = Label.new()
-	_level_label.add_theme_font_size_override("font_size", 18)
+	_level_label = _make_label("", FONT_SIZE_LEVEL, true)
 	_level_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_level_label.position = Vector2(8.0, 8.0)
-	_level_label.visible = false
+	_level_label.position = LEVEL_POSITION
 	add_child(_level_label)
 
-	_combo_label = Label.new()
-	_combo_label.visible = false
-	_combo_label.add_theme_font_size_override("font_size", 24)
+	_combo_label = _make_label("", FONT_SIZE_COMBO, true)
 	_combo_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_combo_label.position.y = 16
+	_combo_label.position.y = COMBO_TOP_Y
 	_combo_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	add_child(_combo_label)
 
-	_goofy_label = Label.new()
-	_goofy_label.text = "GOOFY"
-	_goofy_label.visible = false
-	_goofy_label.add_theme_font_size_override("font_size", 64)
-	_goofy_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_goofy_label.offset_left = -400.0
-	_goofy_label.offset_right = 400.0
-	_goofy_label.offset_top = 60.0
-	_goofy_label.offset_bottom = 140.0
+	_goofy_label = _make_label("GOOFY", FONT_SIZE_BANNER, true)
+	_layout(_goofy_label, GOOFY_ANCHORS, GOOFY_OFFSETS)
 	_goofy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_goofy_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_goofy_label)
 
 	_danger_vignette = ColorRect.new()
 	_danger_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_danger_vignette.color = Color(1.0, 0.0, 0.0, 0.0)
+	_danger_vignette.color = COLOR_VIGNETTE
 	_danger_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_danger_vignette)
 
-	_danger_label = Label.new()
-	_danger_label.visible = false
-	_danger_label.add_theme_font_size_override("font_size", 28)
+	_danger_label = _make_label("", FONT_SIZE_CALLOUT, true)
 	_danger_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_danger_label.position.y = 48
+	_danger_label.position.y = DANGER_TOP_Y
 	_danger_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	add_child(_danger_label)
 
-	_now_playing_label = Label.new()
-	_now_playing_label.text = "now playing\n"
-	_now_playing_label.add_theme_font_size_override("font_size", 17)
+	_now_playing_label = _make_label("now playing\n", FONT_SIZE_NOW_PLAYING, true)
 	_now_playing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_now_playing_label.anchor_left = 1.0
-	_now_playing_label.anchor_right = 1.0
-	_now_playing_label.anchor_top = 0.0
-	_now_playing_label.anchor_bottom = 0.0
-	_now_playing_label.offset_right = -8.0
-	_now_playing_label.offset_left = -206.0
-	_now_playing_label.offset_top = 8.0
-	_now_playing_label.offset_bottom = 50.0
-	_now_playing_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
-	_now_playing_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_now_playing_label.visible = false
+	_layout(_now_playing_label, NOW_PLAYING_ANCHORS, NOW_PLAYING_OFFSETS)
+	_now_playing_label.add_theme_color_override("font_color", COLOR_NOW_PLAYING)
 	add_child(_now_playing_label)
 
 	_skip_btn = Button.new()
 	_skip_btn.text = ">> skip"
-	_skip_btn.add_theme_font_size_override("font_size", 21)
-	_skip_btn.anchor_left = 1.0
-	_skip_btn.anchor_right = 1.0
-	_skip_btn.anchor_top = 0.0
-	_skip_btn.anchor_bottom = 0.0
-	_skip_btn.offset_right = -8.0
-	_skip_btn.offset_left = -116.0
-	_skip_btn.offset_top = 62.0
-	_skip_btn.offset_bottom = 95.0
+	_skip_btn.add_theme_font_size_override("font_size", FONT_SIZE_SKIP)
+	_layout(_skip_btn, SKIP_ANCHORS, SKIP_OFFSETS)
 	_skip_btn.flat = true
-	_skip_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.65))
-	_skip_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1, 1.0))
-	_skip_btn.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 0.4))
+	_skip_btn.add_theme_color_override("font_color", COLOR_SKIP)
+	_skip_btn.add_theme_color_override("font_hover_color", COLOR_SKIP_HOVER)
+	_skip_btn.add_theme_color_override("font_pressed_color", COLOR_SKIP_PRESSED)
 	_skip_btn.visible = false
 	_skip_btn.pressed.connect(MusicManager.skip_song)
 	add_child(_skip_btn)
 
-	_wow_label = Label.new()
-	_wow_label.text = "wow this is fun!"
-	_wow_label.add_theme_font_size_override("font_size", 18)
-	_wow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_wow_label.visible = false
+	_wow_label = _make_label("wow this is fun!", FONT_SIZE_WOW, true)
 	add_child(_wow_label)
 
-	var serif_font := SystemFont.new()
-	serif_font.font_names = PackedStringArray(["Georgia", "Times New Roman", "Times", "serif"])
-
-	_wife_label = Label.new()
-	_wife_label.text = WIFE_CALL_TEXT
-	_wife_label.add_theme_font_size_override("font_size", 20)
-	_wife_label.add_theme_font_override("font", serif_font)
+	_wife_label = _make_label(WIFE_CALL_TEXT, FONT_SIZE_WIFE, true)
+	_wife_label.add_theme_font_override("font", _make_system_font(SERIF_FONT_NAMES))
 	_wife_label.add_theme_color_override("font_color", Color.BLACK)
 	_wife_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_wife_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_wife_label.anchor_left = 1.0
-	_wife_label.anchor_right = 1.0
-	_wife_label.anchor_top = 0.5
-	_wife_label.anchor_bottom = 0.5
-	_wife_label.offset_left = -316.0
-	_wife_label.offset_right = -16.0
-	_wife_label.offset_top = -40.0
-	_wife_label.offset_bottom = 40.0
-	_wife_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_wife_label.visible = false
+	_layout(_wife_label, WIFE_ANCHORS, WIFE_OFFSETS)
 	add_child(_wife_label)
 
-	_woohoo_label = Label.new()
-	_woohoo_label.text = "WOOHOO!!"
-	_woohoo_label.add_theme_font_size_override("font_size", 64)
+	_woohoo_label = _make_label("WOOHOO!!", FONT_SIZE_BANNER, true)
 	_woohoo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_woohoo_label.anchor_left = 0.0
-	_woohoo_label.anchor_right = 1.0
-	_woohoo_label.anchor_top = 0.35
-	_woohoo_label.anchor_bottom = 0.55
-	_woohoo_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_woohoo_label.visible = false
+	_layout(_woohoo_label, WOOHOO_ANCHORS)
 	add_child(_woohoo_label)
 
 	_wife_audio = AudioStreamPlayer.new()
@@ -244,105 +290,43 @@ func _ready() -> void:
 	GameManager.game_started.connect(_on_game_started)
 	GameManager.wife_calling.connect(_on_wife_calling)
 	GameManager.afternoon_started.connect(_on_afternoon_started)
-	_nice_air_label = Label.new()
-	_nice_air_label.text = "nice air!"
-	_nice_air_label.visible = false
-	_nice_air_label.add_theme_font_size_override("font_size", 28)
+
+	_nice_air_label = _make_label("nice air!", FONT_SIZE_CALLOUT, true)
 	_nice_air_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_nice_air_label.anchor_left = 0.5
-	_nice_air_label.anchor_right = 0.5
-	_nice_air_label.anchor_top = 0.5
-	_nice_air_label.anchor_bottom = 0.5
-	_nice_air_label.offset_left = -100.0
-	_nice_air_label.offset_right = 100.0
-	_nice_air_label.offset_top = -20.0
-	_nice_air_label.offset_bottom = 20.0
-	_nice_air_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layout(_nice_air_label, NICE_AIR_ANCHORS, NICE_AIR_OFFSETS)
 	add_child(_nice_air_label)
 
-	_trick_label = Label.new()
+	_trick_label = _make_label("", FONT_SIZE_CALLOUT, true)
 	_trick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_trick_label.anchor_left = 1.0
-	_trick_label.anchor_right = 1.0
-	_trick_label.anchor_top = 1.0
-	_trick_label.anchor_bottom = 1.0
-	_trick_label.offset_left = -347.0
-	_trick_label.offset_right = -12.0
-	_trick_label.offset_top = -105.0
-	_trick_label.offset_bottom = -55.0
-	_trick_label.add_theme_font_size_override("font_size", 28)
-	_trick_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
-	var trick_base_font := SystemFont.new()
-	trick_base_font.font_names = PackedStringArray(["Georgia", "Times New Roman", "serif"])
-	trick_base_font.font_italic = true
-	var trick_font := FontVariation.new()
-	trick_font.base_font = trick_base_font
-	_trick_label.add_theme_font_override("font", trick_font)
-	_trick_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_trick_label.visible = false
+	_layout(_trick_label, TRICK_ANCHORS, TRICK_OFFSETS)
+	_trick_label.add_theme_color_override("font_color", COLOR_ORANGE)
+	_trick_label.add_theme_font_override("font", _make_system_font(TRICK_FONT_NAMES, true))
 	add_child(_trick_label)
 
-	_fun_had_label = Label.new()
+	_fun_had_label = _make_label("", FONT_SIZE_FUN_HAD, true)
 	_fun_had_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_fun_had_label.anchor_left = 1.0
-	_fun_had_label.anchor_right = 1.0
-	_fun_had_label.anchor_top = 1.0
-	_fun_had_label.anchor_bottom = 1.0
-	_fun_had_label.offset_left = -347.0
-	_fun_had_label.offset_right = -12.0
-	_fun_had_label.offset_top = -50.0
-	_fun_had_label.offset_bottom = -12.0
-	_fun_had_label.add_theme_font_size_override("font_size", 18)
-	_fun_had_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
-	var fun_had_base_font := SystemFont.new()
-	fun_had_base_font.font_names = PackedStringArray(["Consolas", "Courier New", "monospace"])
-	var fun_had_font := FontVariation.new()
-	fun_had_font.base_font = fun_had_base_font
-	_fun_had_label.add_theme_font_override("font", fun_had_font)
-	_fun_had_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fun_had_label.visible = false
+	_layout(_fun_had_label, FUN_HAD_ANCHORS, FUN_HAD_OFFSETS)
+	_fun_had_label.add_theme_color_override("font_color", COLOR_ORANGE)
+	_fun_had_label.add_theme_font_override("font", _make_system_font(MONO_FONT_NAMES))
 	add_child(_fun_had_label)
 
-	_tutorial_label = Label.new()
-	_tutorial_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.05))
-	_tutorial_label.add_theme_font_size_override("font_size", 16)
+	_tutorial_label = _make_label("", FONT_SIZE_TUTORIAL, true)
+	_tutorial_label.add_theme_color_override("font_color", COLOR_ORANGE)
 	_tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_tutorial_label.anchor_left = 0.1
-	_tutorial_label.anchor_right = 0.9
-	_tutorial_label.anchor_top = 0.82
-	_tutorial_label.anchor_bottom = 0.95
 	_tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_tutorial_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tutorial_label.visible = false
+	_layout(_tutorial_label, TUTORIAL_ANCHORS)
 	add_child(_tutorial_label)
 
-	_afternoon_label = Label.new()
-	_afternoon_label.text = "looks like the grommets are off from school"
-	_afternoon_label.add_theme_font_size_override("font_size", 14)
-	_afternoon_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.75))
+	_afternoon_label = _make_label("looks like the grommets are off from school", FONT_SIZE_AFTERNOON, true)
+	_afternoon_label.add_theme_color_override("font_color", COLOR_AFTERNOON)
 	_afternoon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_afternoon_label.anchor_left = 0.1
-	_afternoon_label.anchor_right = 0.9
-	_afternoon_label.anchor_top = 0.88
-	_afternoon_label.anchor_bottom = 0.96
-	_afternoon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_afternoon_label.visible = false
+	_layout(_afternoon_label, AFTERNOON_ANCHORS)
 	add_child(_afternoon_label)
 
-	_close_call_label = Label.new()
-	_close_call_label.add_theme_font_size_override("font_size", 22)
-	_close_call_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1))
+	_close_call_label = _make_label("", FONT_SIZE_CLOSE_CALL, true)
+	_close_call_label.add_theme_color_override("font_color", COLOR_GOLD)
 	_close_call_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_close_call_label.anchor_left = 0.0
-	_close_call_label.anchor_right = 0.5
-	_close_call_label.anchor_top = 0.5
-	_close_call_label.anchor_bottom = 0.5
-	_close_call_label.offset_left = 18.0
-	_close_call_label.offset_right = 300.0
-	_close_call_label.offset_top = -16.0
-	_close_call_label.offset_bottom = 16.0
-	_close_call_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_close_call_label.visible = false
+	_layout(_close_call_label, CLOSE_CALL_ANCHORS, CLOSE_CALL_OFFSETS)
 	add_child(_close_call_label)
 
 	_player = get_tree().get_first_node_in_group("player")
@@ -359,60 +343,98 @@ func _ready() -> void:
 	_on_state_changed(GameManager.state)
 
 
-func _build_controls_screen() -> void:
+# --- Builders ---
+
+func _make_label(text: String, font_size: int, start_hidden: bool = false) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", font_size)
+	label.visible = not start_hidden
+	return label
+
+
+## Sets anchors then offsets. Both Vector4(left, top, right, bottom).
+func _layout(control: Control, anchors: Vector4, offsets: Vector4 = Vector4.ZERO) -> void:
+	control.anchor_left = anchors.x
+	control.anchor_right = anchors.z
+	control.anchor_top = anchors.y
+	control.anchor_bottom = anchors.w
+	control.offset_left = offsets.x
+	control.offset_right = offsets.z
+	control.offset_top = offsets.y
+	control.offset_bottom = offsets.w
+
+
+func _make_system_font(names: Array, italic: bool = false) -> SystemFont:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(names)
+	font.font_italic = italic
+	return font
+
+
+## Adds a label to a screen with the given anchors; caller tweaks alignment/color.
+func _add_screen_label(parent: Control, text: String, font_size: int, anchors: Vector4) -> Label:
+	var label := _make_label(text, font_size)
+	_layout(label, anchors)
+	parent.add_child(label)
+	return label
+
+
+func _add_overlay(parent: Control) -> void:
 	var overlay := ColorRect.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.color = SCREEN_OVERLAY_COLOR
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_controls_screen.add_child(overlay)
+	parent.add_child(overlay)
 
-	var title := Label.new()
-	title.text = "HOW TO PLAY"
+
+func _add_back_button(parent: Control, anchors: Vector4, on_pressed: Callable) -> void:
+	var back_btn := Button.new()
+	back_btn.text = "< Back"
+	_layout(back_btn, anchors)
+	back_btn.pressed.connect(on_pressed)
+	parent.add_child(back_btn)
+
+
+## Shifts a label's offsets by a sine wobble around its base offsets.
+func _wobble(label: Label, base_offsets: Vector4, time: float, freq: Vector2, amp: Vector2) -> void:
+	var wx := sin(time * freq.x) * amp.x
+	var wy := sin(time * freq.y) * amp.y
+	label.offset_left = base_offsets.x + wx
+	label.offset_top = base_offsets.y + wy
+	label.offset_right = base_offsets.z + wx
+	label.offset_bottom = base_offsets.w + wy
+
+
+func _build_controls_screen() -> void:
+	_add_overlay(_controls_screen)
+
+	var title := _add_screen_label(_controls_screen, "HOW TO PLAY", FONT_SIZE_CONTROLS_TITLE, CONTROLS_TITLE_ANCHORS)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.anchor_left = 0.0
-	title.anchor_right = 1.0
-	title.anchor_top = 0.06
-	title.anchor_bottom = 0.18
 	title.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	title.add_theme_font_size_override("font_size", 48)
-	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1, 1))
-	_controls_screen.add_child(title)
+	title.add_theme_color_override("font_color", COLOR_GOLD)
 
 	var list := VBoxContainer.new()
-	list.anchor_left = 0.1
-	list.anchor_right = 0.9
-	list.anchor_top = 0.20
-	list.anchor_bottom = 0.85
-	list.add_theme_constant_override("separation", 10)
+	_layout(list, CONTROLS_LIST_ANCHORS)
+	list.add_theme_constant_override("separation", CONTROLS_LIST_SEPARATION)
 	_controls_screen.add_child(list)
 
 	for entry in CONTROLS_DATA:
 		var row := HBoxContainer.new()
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		var key_label := Label.new()
-		key_label.text = entry["key"]
-		key_label.custom_minimum_size.x = 160
-		key_label.add_theme_font_size_override("font_size", 16)
-		key_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1, 1))
+		var key_label := _make_label(entry["key"], FONT_SIZE_CONTROLS_ROW)
+		key_label.custom_minimum_size.x = CONTROLS_KEY_COLUMN_WIDTH
+		key_label.add_theme_color_override("font_color", COLOR_GOLD)
 		row.add_child(key_label)
 
-		var desc_label := Label.new()
-		desc_label.text = entry["desc"]
+		var desc_label := _make_label(entry["desc"], FONT_SIZE_CONTROLS_ROW)
 		desc_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		desc_label.add_theme_font_size_override("font_size", 16)
 		row.add_child(desc_label)
 
 		list.add_child(row)
 
-	var back_btn := Button.new()
-	back_btn.text = "< Back"
-	back_btn.anchor_left = 0.38
-	back_btn.anchor_right = 0.62
-	back_btn.anchor_top = 0.88
-	back_btn.anchor_bottom = 0.96
-	back_btn.pressed.connect(_on_controls_back_pressed)
-	_controls_screen.add_child(back_btn)
+	_add_back_button(_controls_screen, CONTROLS_BACK_ANCHORS, _on_controls_back_pressed)
 
 
 func _connect_level_generator() -> void:
@@ -426,20 +448,11 @@ func _connect_level_generator() -> void:
 func _process(delta: float) -> void:
 	if _goofy_label.visible:
 		_goofy_time += delta
-		var _goofy_wx := sin(_goofy_time * 27.0) * 6.0
-		var _goofy_wy := sin(_goofy_time * 19.0) * 4.0
-		_goofy_label.offset_left = -400.0 + _goofy_wx
-		_goofy_label.offset_right = 400.0 + _goofy_wx
-		_goofy_label.offset_top = 60.0 + _goofy_wy
+		_wobble(_goofy_label, GOOFY_OFFSETS, _goofy_time, GOOFY_WOBBLE_FREQ, GOOFY_WOBBLE_AMP)
 
 	if _nice_air_label.visible:
 		_nice_air_time += delta
-		var wx := sin(_nice_air_time * 31.0) * 5.0
-		var wy := sin(_nice_air_time * 23.0) * 4.0
-		_nice_air_label.offset_left = -100.0 + wx
-		_nice_air_label.offset_right =  100.0 + wx
-		_nice_air_label.offset_top  =  -20.0 + wy
-		_nice_air_label.offset_bottom =  20.0 + wy
+		_wobble(_nice_air_label, NICE_AIR_OFFSETS, _nice_air_time, NICE_AIR_WOBBLE_FREQ, NICE_AIR_WOBBLE_AMP)
 		if is_instance_valid(_player) and _player.is_on_floor():
 			_nice_air_label.visible = false
 			_nice_air_time = 0.0
@@ -449,7 +462,7 @@ func _process(delta: float) -> void:
 		if cam:
 			var sub_size := Vector2(_player.get_viewport().size)
 			var hud_size := Vector2(get_viewport().size)
-			var screen_pos := cam.unproject_position(_player.global_position + Vector3(0, 2.5, 0))
+			var screen_pos := cam.unproject_position(_player.global_position + WOW_WORLD_OFFSET)
 			screen_pos *= hud_size / sub_size
 			_wow_label.position = screen_pos + Vector2(-_wow_label.size.x * 0.5, -_wow_label.size.y)
 
@@ -461,11 +474,7 @@ func _process(delta: float) -> void:
 	if _close_call_label.visible:
 		_close_call_timer -= delta
 		_close_call_wobble_time += delta
-		var wx := sin(_close_call_wobble_time * 29.0) * 4.0
-		var wy := sin(_close_call_wobble_time * 17.0) * 3.0
-		_close_call_label.offset_left = 18.0 + wx
-		_close_call_label.offset_top = -16.0 + wy
-		_close_call_label.offset_bottom = 16.0 + wy
+		_wobble(_close_call_label, CLOSE_CALL_OFFSETS, _close_call_wobble_time, CLOSE_CALL_WOBBLE_FREQ, CLOSE_CALL_WOBBLE_AMP)
 		if _close_call_timer <= 0.0:
 			_close_call_label.visible = false
 
@@ -593,7 +602,7 @@ func _on_stance_changed(goofy: bool) -> void:
 
 
 func _on_wipeout_danger(intensity: float, reason: int) -> void:
-	if intensity < 0.25 or GameManager.state != GameManager.State.PLAYING:
+	if intensity < DANGER_MIN_INTENSITY or GameManager.state != GameManager.State.PLAYING:
 		_danger_label.visible = false
 		_danger_vignette.color.a = 0.0
 		return
@@ -603,158 +612,95 @@ func _on_wipeout_danger(intensity: float, reason: int) -> void:
 		2: _danger_label.text = "LAND CLEAN"  # AIR_YAW
 		3: _danger_label.text = "LEVEL OUT"   # AIR_TILT
 	_danger_label.add_theme_color_override("font_color", Color(1.0, 1.0 - intensity, 0.0))
-	_danger_vignette.color = Color(1.0, 0.0, 0.0, intensity * 0.18)
+	_danger_vignette.color = Color(1.0, 0.0, 0.0, intensity * DANGER_VIGNETTE_MAX_ALPHA)
 
 
 func _build_customize_screen() -> void:
-	var overlay := ColorRect.new()
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.color = SCREEN_OVERLAY_COLOR
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_customize_screen.add_child(overlay)
+	_add_overlay(_customize_screen)
 
-	var title := Label.new()
-	title.text = "CUSTOMIZE JERRY"
+	var title := _add_screen_label(_customize_screen, "CUSTOMIZE JERRY", FONT_SIZE_CUSTOMIZE_TITLE, CUSTOMIZE_TITLE_ANCHORS)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	title.anchor_left = 0.04
-	title.anchor_right = 0.56
-	title.anchor_top = 0.04
-	title.anchor_bottom = 0.16
-	title.add_theme_font_size_override("font_size", 36)
-	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.1, 1))
-	_customize_screen.add_child(title)
+	title.add_theme_color_override("font_color", COLOR_GOLD)
 
-	var jerry_label := Label.new()
-	jerry_label.text = "his jacket:"
-	jerry_label.anchor_left = 0.04
-	jerry_label.anchor_right = 0.56
-	jerry_label.anchor_top = 0.20
-	jerry_label.anchor_bottom = 0.30
-	jerry_label.add_theme_font_size_override("font_size", 18)
-	_customize_screen.add_child(jerry_label)
-
-	var jerry_hbox := HBoxContainer.new()
-	jerry_hbox.anchor_left = 0.04
-	jerry_hbox.anchor_right = 0.56
-	jerry_hbox.anchor_top = 0.31
-	jerry_hbox.anchor_bottom = 0.46
-	jerry_hbox.add_theme_constant_override("separation", 10)
-	_customize_screen.add_child(jerry_hbox)
+	_add_screen_label(_customize_screen, "his jacket:", FONT_SIZE_CUSTOMIZE_SECTION, CUSTOMIZE_JERRY_LABEL_ANCHORS)
+	var jerry_hbox := _add_swatch_row(CUSTOMIZE_JERRY_ROW_ANCHORS)
 
 	_jerry_swatch_styles.clear()
 	for i in JERRY_COLORS.size():
-		var btn := _make_swatch_button(JERRY_COLORS[i], i == _selected_jerry)
-		var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
-		_jerry_swatch_styles.append(style)
-		btn.pressed.connect(_on_jerry_color_selected.bind(i))
-		jerry_hbox.add_child(btn)
+		_add_swatch(jerry_hbox, JERRY_COLORS[i], i == _selected_jerry, _jerry_swatch_styles, _on_jerry_color_selected.bind(i))
 
-	var board_label := Label.new()
-	board_label.text = "his board:"
-	board_label.anchor_left = 0.04
-	board_label.anchor_right = 0.56
-	board_label.anchor_top = 0.50
-	board_label.anchor_bottom = 0.60
-	board_label.add_theme_font_size_override("font_size", 18)
-	_customize_screen.add_child(board_label)
-
-	_board_hbox = HBoxContainer.new()
-	_board_hbox.anchor_left = 0.04
-	_board_hbox.anchor_right = 0.56
-	_board_hbox.anchor_top = 0.61
-	_board_hbox.anchor_bottom = 0.76
-	_board_hbox.add_theme_constant_override("separation", 10)
-	_customize_screen.add_child(_board_hbox)
+	_add_screen_label(_customize_screen, "his board:", FONT_SIZE_CUSTOMIZE_SECTION, CUSTOMIZE_BOARD_LABEL_ANCHORS)
+	_board_hbox = _add_swatch_row(CUSTOMIZE_BOARD_ROW_ANCHORS)
 
 	_board_swatch_styles.clear()
 	var board_count := BOARD_COLORS.size() if AppearanceManager.tutorial_board_unlocked else BOARD_COLORS.size() - 1
 	for i in board_count:
-		var btn := _make_swatch_button(BOARD_COLORS[i], i == _selected_board)
-		var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
-		_board_swatch_styles.append(style)
-		btn.pressed.connect(_on_board_color_selected.bind(i))
-		_board_hbox.add_child(btn)
+		_add_swatch(_board_hbox, BOARD_COLORS[i], i == _selected_board, _board_swatch_styles, _on_board_color_selected.bind(i))
 
 	# Preview panel
 	var preview_panel := Panel.new()
-	preview_panel.anchor_left = 0.62
-	preview_panel.anchor_right = 0.96
-	preview_panel.anchor_top = 0.10
-	preview_panel.anchor_bottom = 0.86
+	_layout(preview_panel, PREVIEW_PANEL_ANCHORS)
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.06, 0.06, 0.10)
-	panel_style.set_corner_radius_all(4)
+	panel_style.bg_color = COLOR_PREVIEW_PANEL
+	panel_style.set_corner_radius_all(PREVIEW_PANEL_CORNER_RADIUS)
 	preview_panel.add_theme_stylebox_override("panel", panel_style)
 	_customize_screen.add_child(preview_panel)
 
-	var preview_label := Label.new()
-	preview_label.text = "preview"
+	var preview_label := _add_screen_label(preview_panel, "preview", FONT_SIZE_PREVIEW, PREVIEW_LABEL_ANCHORS)
 	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	preview_label.anchor_left = 0.0
-	preview_label.anchor_right = 1.0
-	preview_label.anchor_top = 0.04
-	preview_label.anchor_bottom = 0.14
-	preview_label.add_theme_font_size_override("font_size", 13)
-	preview_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.4))
-	preview_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	preview_panel.add_child(preview_label)
+	preview_label.add_theme_color_override("font_color", COLOR_PREVIEW_LABEL)
 
-	_preview_body = ColorRect.new()
-	_preview_body.color = JERRY_COLORS[_selected_jerry]
-	_preview_body.anchor_left = 0.5
-	_preview_body.anchor_right = 0.5
-	_preview_body.anchor_top = 0.5
-	_preview_body.anchor_bottom = 0.5
-	_preview_body.offset_left = -28.0
-	_preview_body.offset_right = 28.0
-	_preview_body.offset_top = -75.0
-	_preview_body.offset_bottom = 35.0
-	_preview_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	preview_panel.add_child(_preview_body)
+	_preview_body = _add_preview_rect(preview_panel, JERRY_COLORS[_selected_jerry], PREVIEW_BODY_OFFSETS)
+	_preview_board = _add_preview_rect(preview_panel, BOARD_COLORS[_selected_board], PREVIEW_BOARD_OFFSETS)
 
-	_preview_board = ColorRect.new()
-	_preview_board.color = BOARD_COLORS[_selected_board]
-	_preview_board.anchor_left = 0.5
-	_preview_board.anchor_right = 0.5
-	_preview_board.anchor_top = 0.5
-	_preview_board.anchor_bottom = 0.5
-	_preview_board.offset_left = -52.0
-	_preview_board.offset_right = 52.0
-	_preview_board.offset_top = 42.0
-	_preview_board.offset_bottom = 55.0
-	_preview_board.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	preview_panel.add_child(_preview_board)
+	_add_back_button(_customize_screen, CUSTOMIZE_BACK_ANCHORS, _on_customize_back_pressed)
 
-	var back_btn := Button.new()
-	back_btn.text = "< Back"
-	back_btn.anchor_left = 0.04
-	back_btn.anchor_right = 0.22
-	back_btn.anchor_top = 0.88
-	back_btn.anchor_bottom = 0.96
-	back_btn.pressed.connect(_on_customize_back_pressed)
-	_customize_screen.add_child(back_btn)
+
+func _add_swatch_row(anchors: Vector4) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	_layout(row, anchors)
+	row.add_theme_constant_override("separation", SWATCH_SEPARATION)
+	_customize_screen.add_child(row)
+	return row
+
+
+func _add_preview_rect(parent: Control, color: Color, offsets: Vector4) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.color = color
+	_layout(rect, CENTER_ANCHORS, offsets)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(rect)
+	return rect
+
+
+## Builds a swatch, records its "normal" style (for selection borders) and adds it to the row.
+func _add_swatch(row: HBoxContainer, color: Color, selected: bool, styles: Array[StyleBoxFlat], on_pressed: Callable) -> void:
+	var btn := _make_swatch_button(color, selected)
+	styles.append(btn.get_theme_stylebox("normal") as StyleBoxFlat)
+	btn.pressed.connect(on_pressed)
+	row.add_child(btn)
 
 
 func _make_swatch_button(color: Color, selected: bool) -> Button:
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(52, 52)
+	btn.custom_minimum_size = SWATCH_SIZE
 	btn.text = ""
 
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = color
-	normal.set_corner_radius_all(3)
-	normal.set_border_width_all(3 if selected else 0)
+	normal.set_corner_radius_all(SWATCH_CORNER_RADIUS)
+	normal.set_border_width_all(SWATCH_SELECTED_BORDER if selected else 0)
 	normal.border_color = Color.WHITE
 
 	var hover := StyleBoxFlat.new()
-	hover.bg_color = color.lightened(0.15)
-	hover.set_corner_radius_all(3)
-	hover.set_border_width_all(2)
-	hover.border_color = Color(1, 1, 1, 0.7)
+	hover.bg_color = color.lightened(SWATCH_HOVER_LIGHTEN)
+	hover.set_corner_radius_all(SWATCH_CORNER_RADIUS)
+	hover.set_border_width_all(SWATCH_HOVER_BORDER)
+	hover.border_color = SWATCH_HOVER_BORDER_COLOR
 
 	var focus := StyleBoxFlat.new()
 	focus.bg_color = color
-	focus.set_corner_radius_all(3)
+	focus.set_corner_radius_all(SWATCH_CORNER_RADIUS)
 
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
@@ -768,7 +714,7 @@ func _on_jerry_color_selected(idx: int) -> void:
 	AppearanceManager.jerry_color = JERRY_COLORS[idx]
 	AppearanceManager.appearance_changed.emit()
 	for i in _jerry_swatch_styles.size():
-		_jerry_swatch_styles[i].set_border_width_all(3 if i == idx else 0)
+		_jerry_swatch_styles[i].set_border_width_all(SWATCH_SELECTED_BORDER if i == idx else 0)
 	if is_instance_valid(_preview_body):
 		_preview_body.color = JERRY_COLORS[idx]
 
@@ -778,7 +724,7 @@ func _on_board_color_selected(idx: int) -> void:
 	AppearanceManager.board_color = BOARD_COLORS[idx]
 	AppearanceManager.appearance_changed.emit()
 	for i in _board_swatch_styles.size():
-		_board_swatch_styles[i].set_border_width_all(3 if i == idx else 0)
+		_board_swatch_styles[i].set_border_width_all(SWATCH_SELECTED_BORDER if i == idx else 0)
 	if is_instance_valid(_preview_board):
 		_preview_board.color = BOARD_COLORS[idx]
 
@@ -857,8 +803,7 @@ func _on_trick_named(trick: String) -> void:
 		return
 	_trick_label.text = trick
 	_trick_label.visible = true
-	_trick_label_timer = 2.5
-	_trick_jiggle_time = 0.0
+	_trick_label_timer = TRICK_DISPLAY_TIME
 
 
 func _on_song_changed(song_name: String) -> void:
@@ -931,8 +876,4 @@ func _on_tutorial_board_unlocked() -> void:
 	if not is_instance_valid(_board_hbox):
 		return
 	var i := BOARD_COLORS.size() - 1
-	var btn := _make_swatch_button(BOARD_COLORS[i], i == _selected_board)
-	var style := btn.get_theme_stylebox("normal") as StyleBoxFlat
-	_board_swatch_styles.append(style)
-	btn.pressed.connect(_on_board_color_selected.bind(i))
-	_board_hbox.add_child(btn)
+	_add_swatch(_board_hbox, BOARD_COLORS[i], i == _selected_board, _board_swatch_styles, _on_board_color_selected.bind(i))
