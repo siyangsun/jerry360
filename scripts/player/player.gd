@@ -125,8 +125,6 @@ var _is_squatting: bool = false
 var _turn_burst_frames: int = 0
 var _turn_burst_dir: float = 0.0
 
-var _jerry_material: StandardMaterial3D
-var _board_material: StandardMaterial3D
 
 var _trick_had_rail: bool = false
 var _trick_finalize_timer: float = 0.0
@@ -151,7 +149,8 @@ var _wipeout_danger_reason: WipeoutReason = WipeoutReason.NONE
 @onready var _squat_root: Node3D = $SquatRoot
 @onready var mesh_pivot: Node3D = $SquatRoot/MeshPivot
 @onready var _board_pivot: Node3D = $BoardPivot
-@onready var snowboard_mesh: MeshInstance3D = $BoardPivot/SnowboardMesh
+@onready var _body: Node3D = $SquatRoot/MeshPivot/Body
+@onready var _snowboard: Node3D = $BoardPivot/Snowboard
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 
 const COLLIDER_FULL_HEIGHT := 1.0
@@ -176,18 +175,6 @@ func _ready() -> void:
 	_squat_root.scale = Vector3.ONE
 	_capsule = _collision_shape.shape as CapsuleShape3D
 	assert(_capsule != null, "Player CollisionShape3D must use a CapsuleShape3D — check main.tscn")
-
-	_jerry_material = StandardMaterial3D.new()
-	_jerry_material.metallic = 0.9
-	_jerry_material.metallic_specular = 1.0
-	_jerry_material.roughness = 0.05
-	var boarder_mesh := $SquatRoot/MeshPivot/BoarderMesh as MeshInstance3D
-	if is_instance_valid(boarder_mesh):
-		boarder_mesh.set_surface_override_material(0, _jerry_material)
-
-	_board_material = StandardMaterial3D.new()
-	_board_material.roughness = 1.0
-	snowboard_mesh.set_surface_override_material(0, _board_material)
 
 	AppearanceManager.appearance_changed.connect(_apply_appearance)
 	_apply_appearance()
@@ -891,13 +878,16 @@ func _make_snow_particles() -> GPUParticles3D:
 	return p
 
 
+## Rebuilds Jerry's body and board from the current picks. Goofy needs no special case:
+## mesh_pivot/board_pivot already yaw by PI, which carries the +X jacket face to world -X unmirrored.
 func _apply_appearance() -> void:
-	_jerry_material.albedo_color = AppearanceManager.jerry_color
-	_board_material.albedo_color = AppearanceManager.board_color
+	for child in _body.get_children() + _snowboard.get_children():
+		child.queue_free()
+	AppearanceManager.build_rider_body(_body, AppearanceManager.jacket, AppearanceManager.helmet, AppearanceManager.pants, AppearanceManager.goggles)
+	AppearanceManager.build_board(_snowboard, AppearanceManager.board)
 
 
 func _on_game_started() -> void:
-	_apply_appearance()
 	_trick_had_rail = false
 	_trick_finalize_timer = 0.0
 	_pending_trick_spin = 0.0

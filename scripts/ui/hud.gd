@@ -24,18 +24,6 @@ const COLOR_PREVIEW_LABEL := Color(1.0, 1.0, 1.0, 0.4)
 const COLOR_PREVIEW_PANEL := Color(0.06, 0.06, 0.10)
 const COLOR_VIGNETTE := Color(1.0, 0.0, 0.0, 0.0)
 
-const JERRY_COLORS: Array[Color] = [
-	Color(1.0, 0.45, 0.05),   # burnt orange (default)
-	Color(0.12, 0.22, 0.75),  # navy
-	Color(0.85, 0.08, 0.12),  # cherry
-	Color(0.08, 0.55, 0.18),  # pine
-]
-const BOARD_COLORS: Array[Color] = [
-	Color(0.18, 0.18, 0.18),  # slate (default)
-	Color(0.95, 0.82, 0.08),  # marigold
-	Color(0.04, 0.42, 1.0),   # electric blue (tutorial unlock)
-]
-
 const CONTROLS_DATA: Array[Dictionary] = [
 	{"key": "Left / Right",        "desc": "Steer the board left and right"},
 	{"key": "A / D",               "desc": "Lean — shifts weight sideways and carves"},
@@ -118,16 +106,19 @@ const CONTROLS_LIST_SEPARATION := 10
 const CONTROLS_KEY_COLUMN_WIDTH := 160.0
 
 const CUSTOMIZE_TITLE_ANCHORS := Vector4(0.04, 0.04, 0.56, 0.16)
-const CUSTOMIZE_JERRY_LABEL_ANCHORS := Vector4(0.04, 0.20, 0.56, 0.30)
-const CUSTOMIZE_JERRY_ROW_ANCHORS := Vector4(0.04, 0.31, 0.56, 0.46)
-const CUSTOMIZE_BOARD_LABEL_ANCHORS := Vector4(0.04, 0.50, 0.56, 0.60)
-const CUSTOMIZE_BOARD_ROW_ANCHORS := Vector4(0.04, 0.61, 0.56, 0.76)
+# Option rows (label + swatches on one line), stacked from the first row's anchors by CUSTOMIZE_ROW_STEP
+const CUSTOMIZE_FIRST_ROW_ANCHORS := Vector4(0.04, 0.18, 0.60, 0.27)
+const CUSTOMIZE_ROW_STEP := 0.13
+const CUSTOMIZE_ROW_LABEL_WIDTH := 110.0
 const CUSTOMIZE_BACK_ANCHORS := Vector4(0.04, 0.88, 0.22, 0.96)
 const PREVIEW_PANEL_ANCHORS := Vector4(0.62, 0.10, 0.96, 0.86)
 const PREVIEW_LABEL_ANCHORS := Vector4(0.0, 0.04, 1.0, 0.14)
 const PREVIEW_PANEL_CORNER_RADIUS := 4
-const PREVIEW_BODY_OFFSETS := Vector4(-28.0, -75.0, 28.0, 35.0)
-const PREVIEW_BOARD_OFFSETS := Vector4(-52.0, 42.0, 52.0, 55.0)
+const PREVIEW_BODY_WIDTH := 60.0   # px for the torso's 0.6 m jacket-front face; sets the preview's px-per-metre
+const PREVIEW_FEET_Y := 35.0       # px offset of the feet from the panel centre
+const PREVIEW_LID_SCALE := 1.43    # preview-only: enlarges the 0.28 m lid (28 px -> ~40 px) so it reads in the lodge
+const PREVIEW_BOARD_OFFSETS := Vector4(-13.0, -4.0, 13.0, 100.0)   # upright board sprite, then rotated flat
+const PREVIEW_BOARD_ROTATION := -PI * 0.5  # nose left, so sprite text reads upright
 const CENTER_ANCHORS := Vector4(0.5, 0.5, 0.5, 0.5)
 
 # Swatches
@@ -138,6 +129,7 @@ const SWATCH_SELECTED_BORDER := 3
 const SWATCH_HOVER_BORDER := 2
 const SWATCH_HOVER_LIGHTEN := 0.15
 const SWATCH_HOVER_BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.7)
+const SWATCH_TEXTURE_BG := Color(0.06, 0.06, 0.10)  # behind goggle/board thumbnails
 
 # Wobble: sine frequency (rad/s) and amplitude (px) per axis
 const GOOFY_WOBBLE_FREQ := Vector2(27.0, 19.0)
@@ -186,13 +178,13 @@ var _wife_audio: AudioStreamPlayer
 var _wow_label: Label
 var _wow_timer: float = 0.0
 var _wife_call_active: bool = false
-var _jerry_swatch_styles: Array[StyleBoxFlat] = []
-var _board_swatch_styles: Array[StyleBoxFlat] = []
+var _swatch_styles: Dictionary = {}  # appearance part (StringName) -> Array of StyleBoxFlat
 var _board_hbox: HBoxContainer
-var _preview_body: ColorRect
-var _preview_board: ColorRect
-var _selected_jerry: int = 0
-var _selected_board: int = 0
+var _preview_helmet: ColorRect
+var _preview_jacket: TextureRect
+var _preview_goggles: TextureRect
+var _preview_pants: ColorRect
+var _preview_board: TextureRect
 var _wife_call_timer: float = 0.0
 var _wife_kill_timer: float = 0.0
 var _woohoo_timer: float = 0.0
@@ -622,20 +614,24 @@ func _build_customize_screen() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	title.add_theme_color_override("font_color", COLOR_GOLD)
 
-	_add_screen_label(_customize_screen, "his jacket:", FONT_SIZE_CUSTOMIZE_SECTION, CUSTOMIZE_JERRY_LABEL_ANCHORS)
-	var jerry_hbox := _add_swatch_row(CUSTOMIZE_JERRY_ROW_ANCHORS)
-
-	_jerry_swatch_styles.clear()
-	for i in JERRY_COLORS.size():
-		_add_swatch(jerry_hbox, JERRY_COLORS[i], i == _selected_jerry, _jerry_swatch_styles, _on_jerry_color_selected.bind(i))
-
-	_add_screen_label(_customize_screen, "his board:", FONT_SIZE_CUSTOMIZE_SECTION, CUSTOMIZE_BOARD_LABEL_ANCHORS)
-	_board_hbox = _add_swatch_row(CUSTOMIZE_BOARD_ROW_ANCHORS)
-
-	_board_swatch_styles.clear()
-	var board_count := BOARD_COLORS.size() if AppearanceManager.tutorial_board_unlocked else BOARD_COLORS.size() - 1
+	var row := _add_option_row("his jacket:", 0)
+	for i in AppearanceManager.JACKET_COLORS.size():
+		_add_option_swatch(row, &"jacket", i, AppearanceManager.JACKET_COLORS[i])
+	row = _add_option_row("lid:", 1)
+	for i in AppearanceManager.HELMET_COLORS.size():
+		_add_option_swatch(row, &"helmet", i, AppearanceManager.HELMET_COLORS[i])
+	row = _add_option_row("legs:", 2)
+	for i in AppearanceManager.PANTS_COLORS.size():
+		_add_option_swatch(row, &"pants", i, AppearanceManager.PANTS_COLORS[i])
+	row = _add_option_row("eyes:", 3)
+	for i in AppearanceManager.GOGGLE_HUE_SHIFTS.size():
+		_add_option_swatch(row, &"goggles", i, SWATCH_TEXTURE_BG, AppearanceManager.goggle_texture(i))
+	_board_hbox = _add_option_row("board:", 4)
+	var board_count: int = AppearanceManager.grommet_board_count()
+	if AppearanceManager.tutorial_board_unlocked:
+		board_count = AppearanceManager.BOARD_TEXTURE_PATHS.size()
 	for i in board_count:
-		_add_swatch(_board_hbox, BOARD_COLORS[i], i == _selected_board, _board_swatch_styles, _on_board_color_selected.bind(i))
+		_add_option_swatch(_board_hbox, &"board", i, SWATCH_TEXTURE_BG, AppearanceManager.board_texture(i))
 
 	# Preview panel
 	var preview_panel := Panel.new()
@@ -650,38 +646,93 @@ func _build_customize_screen() -> void:
 	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview_label.add_theme_color_override("font_color", COLOR_PREVIEW_LABEL)
 
-	_preview_body = _add_preview_rect(preview_panel, JERRY_COLORS[_selected_jerry], PREVIEW_BODY_OFFSETS)
-	_preview_board = _add_preview_rect(preview_panel, BOARD_COLORS[_selected_board], PREVIEW_BOARD_OFFSETS)
+	# Body stacked bottom-up at the same proportions as the 3D rider
+	var px_per_m := PREVIEW_BODY_WIDTH / AppearanceManager.BODY_SIZE.z
+	var half_w := PREVIEW_BODY_WIDTH * 0.5
+	var pants_top := PREVIEW_FEET_Y - AppearanceManager.PANTS_HEIGHT * px_per_m
+	var jacket_top := pants_top - AppearanceManager.JACKET_HEIGHT * px_per_m
+	var lid_size := AppearanceManager.HELMET_SIZE.y * px_per_m * PREVIEW_LID_SCALE
+	var lid_top := jacket_top - lid_size
+	_preview_pants = _add_preview_rect(preview_panel, Vector4(-half_w, pants_top, half_w, PREVIEW_FEET_Y))
+	_preview_jacket = _add_preview_texture(preview_panel, Vector4(-half_w, jacket_top, half_w, pants_top), TextureRect.STRETCH_SCALE)
+	# Lid is a cube narrower than the torso, centred over the jacket
+	var lid_half_w := AppearanceManager.HELMET_SIZE.z * px_per_m * PREVIEW_LID_SCALE * 0.5
+	_preview_helmet = _add_preview_rect(preview_panel, Vector4(-lid_half_w, lid_top, lid_half_w, jacket_top))
+
+	# Goggles centred on the lid, sized exactly like the 3D rig's goggle quad
+	var gsize := AppearanceManager.goggle_size(lid_half_w * 2.0, lid_size)
+	var g_center_y := (lid_top + jacket_top) * 0.5
+	_preview_goggles = _add_preview_texture(preview_panel,
+		Vector4(-gsize.x * 0.5, g_center_y - gsize.y * 0.5, gsize.x * 0.5, g_center_y + gsize.y * 0.5),
+		TextureRect.STRETCH_SCALE)
+
+	_preview_board = _add_preview_texture(preview_panel, PREVIEW_BOARD_OFFSETS, TextureRect.STRETCH_SCALE)
+	var b := PREVIEW_BOARD_OFFSETS
+	_preview_board.pivot_offset = Vector2(b.z - b.x, b.w - b.y) * 0.5
+	_preview_board.rotation = PREVIEW_BOARD_ROTATION
+	_refresh_preview()
 
 	_add_back_button(_customize_screen, CUSTOMIZE_BACK_ANCHORS, _on_customize_back_pressed)
 
 
-func _add_swatch_row(anchors: Vector4) -> HBoxContainer:
+## Adds a "label: [swatches]" row; index stacks rows downward by CUSTOMIZE_ROW_STEP.
+func _add_option_row(label_text: String, index: int) -> HBoxContainer:
+	var a := CUSTOMIZE_FIRST_ROW_ANCHORS
+	var dy := CUSTOMIZE_ROW_STEP * index
 	var row := HBoxContainer.new()
-	_layout(row, anchors)
+	_layout(row, Vector4(a.x, a.y + dy, a.z, a.w + dy))
 	row.add_theme_constant_override("separation", SWATCH_SEPARATION)
 	_customize_screen.add_child(row)
+	var label := _make_label(label_text, FONT_SIZE_CUSTOMIZE_SECTION)
+	label.custom_minimum_size.x = CUSTOMIZE_ROW_LABEL_WIDTH
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(label)
 	return row
 
 
-func _add_preview_rect(parent: Control, color: Color, offsets: Vector4) -> ColorRect:
+func _add_preview_rect(parent: Control, offsets: Vector4) -> ColorRect:
 	var rect := ColorRect.new()
-	rect.color = color
 	_layout(rect, CENTER_ANCHORS, offsets)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(rect)
 	return rect
 
 
-## Builds a swatch, records its "normal" style (for selection borders) and adds it to the row.
-func _add_swatch(row: HBoxContainer, color: Color, selected: bool, styles: Array[StyleBoxFlat], on_pressed: Callable) -> void:
-	var btn := _make_swatch_button(color, selected)
-	styles.append(btn.get_theme_stylebox("normal") as StyleBoxFlat)
-	btn.pressed.connect(on_pressed)
+func _make_nearest_texture_rect(stretch: TextureRect.StretchMode) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = stretch
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect
+
+
+func _add_preview_texture(parent: Control, offsets: Vector4, stretch: TextureRect.StretchMode) -> TextureRect:
+	var rect := _make_nearest_texture_rect(stretch)
+	_layout(rect, CENTER_ANCHORS, offsets)
+	parent.add_child(rect)
+	return rect
+
+
+func _refresh_preview() -> void:
+	_preview_helmet.color = AppearanceManager.HELMET_COLORS[AppearanceManager.helmet]
+	_preview_jacket.texture = AppearanceManager.jacket_texture(AppearanceManager.jacket)
+	_preview_goggles.texture = AppearanceManager.goggle_texture(AppearanceManager.goggles)
+	_preview_pants.color = AppearanceManager.PANTS_COLORS[AppearanceManager.pants]
+	_preview_board.texture = AppearanceManager.board_texture(AppearanceManager.board)
+
+
+## Builds a swatch for one appearance option, records its "normal" style (for selection borders) and adds it to the row.
+func _add_option_swatch(row: HBoxContainer, part: StringName, idx: int, color: Color, texture: Texture2D = null) -> void:
+	var btn := _make_swatch_button(color, idx == AppearanceManager.get(part), texture)
+	if not _swatch_styles.has(part):
+		_swatch_styles[part] = []
+	_swatch_styles[part].append(btn.get_theme_stylebox("normal"))
+	btn.pressed.connect(_on_option_selected.bind(part, idx))
 	row.add_child(btn)
 
 
-func _make_swatch_button(color: Color, selected: bool) -> Button:
+func _make_swatch_button(color: Color, selected: bool, texture: Texture2D = null) -> Button:
 	var btn := Button.new()
 	btn.custom_minimum_size = SWATCH_SIZE
 	btn.text = ""
@@ -698,35 +749,30 @@ func _make_swatch_button(color: Color, selected: bool) -> Button:
 	hover.set_border_width_all(SWATCH_HOVER_BORDER)
 	hover.border_color = SWATCH_HOVER_BORDER_COLOR
 
-	var focus := StyleBoxFlat.new()
-	focus.bg_color = color
-	focus.set_corner_radius_all(SWATCH_CORNER_RADIUS)
+	# Focus is drawn on top of "normal"; an opaque focus box hid the clicked swatch's selection border
+	var focus := StyleBoxEmpty.new()
 
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("pressed", normal)
 	btn.add_theme_stylebox_override("focus", focus)
+
+	if texture != null:
+		# Thumbnail inset by the selection border so the white outline stays visible
+		var inset := float(SWATCH_SELECTED_BORDER)
+		var thumb := _make_nearest_texture_rect(TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+		thumb.texture = texture
+		_layout(thumb, Vector4(0.0, 0.0, 1.0, 1.0), Vector4(inset, inset, -inset, -inset))
+		btn.add_child(thumb)
 	return btn
 
 
-func _on_jerry_color_selected(idx: int) -> void:
-	_selected_jerry = idx
-	AppearanceManager.jerry_color = JERRY_COLORS[idx]
-	AppearanceManager.appearance_changed.emit()
-	for i in _jerry_swatch_styles.size():
-		_jerry_swatch_styles[i].set_border_width_all(SWATCH_SELECTED_BORDER if i == idx else 0)
-	if is_instance_valid(_preview_body):
-		_preview_body.color = JERRY_COLORS[idx]
-
-
-func _on_board_color_selected(idx: int) -> void:
-	_selected_board = idx
-	AppearanceManager.board_color = BOARD_COLORS[idx]
-	AppearanceManager.appearance_changed.emit()
-	for i in _board_swatch_styles.size():
-		_board_swatch_styles[i].set_border_width_all(SWATCH_SELECTED_BORDER if i == idx else 0)
-	if is_instance_valid(_preview_board):
-		_preview_board.color = BOARD_COLORS[idx]
+func _on_option_selected(part: StringName, idx: int) -> void:
+	AppearanceManager.select(part, idx)
+	var styles: Array = _swatch_styles[part]
+	for i in styles.size():
+		(styles[i] as StyleBoxFlat).set_border_width_all(SWATCH_SELECTED_BORDER if i == idx else 0)
+	_refresh_preview()
 
 
 func _on_customize_pressed() -> void:
@@ -875,5 +921,5 @@ func _on_close_call() -> void:
 func _on_tutorial_board_unlocked() -> void:
 	if not is_instance_valid(_board_hbox):
 		return
-	var i := BOARD_COLORS.size() - 1
-	_add_swatch(_board_hbox, BOARD_COLORS[i], i == _selected_board, _board_swatch_styles, _on_board_color_selected.bind(i))
+	var i := AppearanceManager.BOARD_TEXTURE_PATHS.size() - 1
+	_add_option_swatch(_board_hbox, &"board", i, SWATCH_TEXTURE_BG, AppearanceManager.board_texture(i))

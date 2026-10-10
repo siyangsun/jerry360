@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Shader" path="res://assets/shaders/player_fog.gdshader" id="1_playerfog"]
 [ext_resource type="Script" path="res://scripts/world/player_fog.gd" id="1_playerfogscript"]
@@ -9,24 +9,6 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="5_hud"]
 [ext_resource type="PackedScene" path="res://scenes/player/jerry_trail.tscn" id="6_trail"]
 [ext_resource type="PackedScene" path="res://scenes/fx/posterize.tscn" id="7_post"]
-
-[sub_resource type="StandardMaterial3D" id="Mat_jerry"]
-albedo_color = Color(1.0, 0.45, 0.05, 1)
-metallic = 0.9
-metallic_specular = 1.0
-roughness = 0.05
-
-[sub_resource type="BoxMesh" id="BoxMesh_boarder"]
-size = Vector3(0.3, 1.0, 0.6)
-material = SubResource("Mat_jerry")
-
-[sub_resource type="StandardMaterial3D" id="Mat_board"]
-albedo_color = Color(0.18, 0.18, 0.18, 1)
-roughness = 1.0
-
-[sub_resource type="BoxMesh" id="BoxMesh_board"]
-size = Vector3(0.55, 0.08, 1.44)
-material = SubResource("Mat_board")
 
 [sub_resource type="CapsuleShape3D" id="Capsule_player"]
 radius = 0.3
@@ -93,15 +75,13 @@ script = ExtResource("4_player")
 [node name="MeshPivot" type="Node3D" parent="SubViewportContainer/SubViewport/Player/SquatRoot"]
 position = Vector3(0, 0.5, 0)
 
-[node name="BoarderMesh" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/Player/SquatRoot/MeshPivot"]
-mesh = SubResource("BoxMesh_boarder")
+[node name="Body" type="Node3D" parent="SubViewportContainer/SubViewport/Player/SquatRoot/MeshPivot"]
 
 [node name="BoardPivot" type="Node3D" parent="SubViewportContainer/SubViewport/Player"]
 position = Vector3(0, 0.5, 0)
 
-[node name="SnowboardMesh" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/Player/BoardPivot"]
+[node name="Snowboard" type="Node3D" parent="SubViewportContainer/SubViewport/Player/BoardPivot"]
 position = Vector3(0, -0.46, 0)
-mesh = SubResource("BoxMesh_board")
 
 [node name="JerryTrail" parent="SubViewportContainer/SubViewport/Player" instance=ExtResource("6_trail")]
 

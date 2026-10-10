@@ -9,26 +9,13 @@ const LANE_SWITCH_INTERVAL_MAX := 9.0
 const SPEED_VARIANCE_MIN := 0.82
 const SPEED_VARIANCE_MAX := 1.08
 
-const BODY_SIZE := Vector3(0.3, 1.0, 0.6)       # rider body box
-const BODY_METALLIC := 0.9
-const BODY_SPECULAR := 1.0
-const BODY_ROUGHNESS := 0.05
 const BODY_CENTER_Y := 0.5
-const BOARD_SIZE := Vector3(0.55, 0.08, 1.44)   # snowboard box
-const BOARD_COLOR := Color(0.18, 0.18, 0.18)
-const BOARD_ROUGHNESS := 1.0
 const BOARD_CENTER_Y := 0.04
+const GOOFY_CHANCE := 0.3                       # fraction of grommets riding goofy (jacket faces -X)
 const COLLIDER_RADIUS := 0.3                    # solid capsule (matches Jerry's)
 const COLLIDER_HEIGHT := 1.0
 const HIT_AREA_RADIUS := 0.42                   # kill-zone capsule that crashes Jerry
 const HIT_AREA_HEIGHT := 1.2
-
-const RIDER_COLORS: Array[Color] = [
-	Color(1.0, 0.45, 0.05),   # burnt orange
-	Color(0.12, 0.22, 0.75),  # navy
-	Color(0.85, 0.08, 0.12),  # cherry
-	Color(0.08, 0.55, 0.18),  # pine
-]
 
 # Wipeout parameters — read from Jerry's node in _ready() so they stay in sync
 var _wipeout_duration: float     = 2.2
@@ -40,9 +27,7 @@ var _wipeout_wobble_amp: float   = 0.7
 var _wipeout_phase1_end: float   = 0.35
 var _wipeout_phase2_end: float   = 0.75
 
-# Shared across every rider: one mesh per color, one board mesh, one pair of shapes
-static var _body_meshes: Array[BoxMesh] = []
-static var _board_mesh: BoxMesh
+# Shared across every rider (meshes/materials are cached in AppearanceManager)
 static var _collider_shape: CapsuleShape3D
 static var _hit_area_shape: CapsuleShape3D
 
@@ -80,7 +65,7 @@ func _ready() -> void:
 		_wipeout_phase1_end    = player.wipeout_phase1_end
 		_wipeout_phase2_end    = player.wipeout_phase2_end
 
-	_build_visuals(randi() % RIDER_COLORS.size())
+	_build_visuals()
 	_build_collision()
 
 
@@ -163,45 +148,26 @@ func _pick_new_lane() -> void:
 		_target_lane = options[randi() % options.size()]
 
 
-func _build_visuals(color_index: int) -> void:
+## Each part rolls independently from the same lists Jerry picks from; never the sponsored board.
+func _build_visuals() -> void:
 	_mesh_pivot = Node3D.new()
 	add_child(_mesh_pivot)
 
-	var body_mesh := MeshInstance3D.new()
-	body_mesh.mesh = _get_body_mesh(color_index)
-	body_mesh.position.y = BODY_CENTER_Y
-	_mesh_pivot.add_child(body_mesh)
+	var body := Node3D.new()
+	body.position.y = BODY_CENTER_Y
+	if randf() < GOOFY_CHANCE:
+		body.rotation.y = PI  # carries the jacket/goggle face to -X without mirroring it
+	_mesh_pivot.add_child(body)
+	AppearanceManager.build_rider_body(body,
+		randi() % AppearanceManager.JACKET_COLORS.size(),
+		randi() % AppearanceManager.HELMET_COLORS.size(),
+		randi() % AppearanceManager.PANTS_COLORS.size(),
+		randi() % AppearanceManager.GOGGLE_HUE_SHIFTS.size())
 
-	var board_mesh := MeshInstance3D.new()
-	board_mesh.mesh = _get_board_mesh()
-	board_mesh.position.y = BOARD_CENTER_Y
-	_mesh_pivot.add_child(board_mesh)
-
-
-static func _get_body_mesh(color_index: int) -> BoxMesh:
-	if _body_meshes.is_empty():
-		for color in RIDER_COLORS:
-			var mat := StandardMaterial3D.new()
-			mat.albedo_color = color
-			mat.metallic = BODY_METALLIC
-			mat.metallic_specular = BODY_SPECULAR
-			mat.roughness = BODY_ROUGHNESS
-			var box := BoxMesh.new()
-			box.size = BODY_SIZE
-			box.material = mat
-			_body_meshes.append(box)
-	return _body_meshes[color_index]
-
-
-static func _get_board_mesh() -> BoxMesh:
-	if _board_mesh == null:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = BOARD_COLOR
-		mat.roughness = BOARD_ROUGHNESS
-		_board_mesh = BoxMesh.new()
-		_board_mesh.size = BOARD_SIZE
-		_board_mesh.material = mat
-	return _board_mesh
+	var board := Node3D.new()
+	board.position.y = BOARD_CENTER_Y
+	_mesh_pivot.add_child(board)
+	AppearanceManager.build_board(board, randi() % AppearanceManager.grommet_board_count())
 
 
 static func _get_capsule(radius: float, height: float) -> CapsuleShape3D:
