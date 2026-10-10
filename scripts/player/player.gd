@@ -51,6 +51,7 @@ const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 @export var lean_forward_recovery_yaw := 0.05 # alignment tolerance during lean-forward recovery
 @export var lean_back_angle := 0.22           # how far back Jerry leans when braking on the ground (cosmetic)
 @export var air_lean_back_angle := 0.22       # how far back Jerry leans when holding lean-back in the air (cosmetic)
+@export var pose_tilt_threshold_deg := 30.0   # HUD mannequin stays upright until Jerry's pitch passes this, then shows the full angle
 @export var lean_back_landing_bonus_deg := 20.0 # extra spin-angle forgiveness when leaning back at landing
 @export var lean_back_tilt_factor := 1.4      # land_tilt_wipeout is multiplied by this when leaning back at landing
 @export var lean_back_brake := 8.0            # braking force when holding lean back
@@ -158,6 +159,59 @@ const COLLIDER_HEIGHT_EPSILON := 0.001  # capsule height is only rewritten when 
 
 var _capsule: CapsuleShape3D
 
+# --- Current action (what Jerry is doing), for the HUD mannequin and anything else that cares ---
+# Values double as mannequin sprite file names.
+const ACTION_WIPEOUT := &"wipeout"
+const ACTION_GRAB_FRONT := &"grab-frontside"
+const ACTION_GRAB_BACK := &"grab-backside"
+const ACTION_SPIN_LEFT := &"spin-left"
+const ACTION_SPIN_RIGHT := &"spin-right"
+const ACTION_GRIND := &"grind-rail"
+const ACTION_BRAKE := &"brake"
+const ACTION_TURN_LEFT := &"turn-left"
+const ACTION_TURN_RIGHT := &"turn-right"
+const ACTION_NEUTRAL := &"neutral"
+const ACTIONS: Array[StringName] = [
+	ACTION_WIPEOUT, ACTION_GRAB_FRONT, ACTION_GRAB_BACK, ACTION_SPIN_LEFT, ACTION_SPIN_RIGHT,
+	ACTION_GRIND, ACTION_BRAKE, ACTION_TURN_LEFT, ACTION_TURN_RIGHT, ACTION_NEUTRAL,
+]
+const LEAN_TURN_ENTER := 1.0       # |lean velocity| (m/s) that starts a lean-turn action
+const LEAN_TURN_EXIT := 0.6        # ...and drops below which it ends (hysteresis)
+
+var _lean_turning: bool = false    # lean-turn hysteresis state, updated each physics tick
+
+## Shauna's priority list, first match wins:
+## wipeout > grab > spin > rail > brake > turn > neutral.
+var current_action: StringName:
+	get:
+		if _is_wiping_out or _is_dead:
+			return ACTION_WIPEOUT
+		var on_floor := is_on_floor()
+		if not on_floor and _grab_earned != 0:
+			var frontside := (_grab_earned > 0) != is_goofy  # goofy swaps front/back
+			return ACTION_GRAB_FRONT if frontside else ACTION_GRAB_BACK
+		if (not on_floor or _on_rail) and _turn_input != 0.0:
+			return ACTION_SPIN_RIGHT if _turn_input > 0.0 else ACTION_SPIN_LEFT
+		if _on_rail:
+			return ACTION_GRIND
+		if _is_leaning_back:
+			return ACTION_BRAKE
+		if on_floor:
+			if _turn_input != 0.0:
+				return ACTION_TURN_RIGHT if _turn_input > 0.0 else ACTION_TURN_LEFT
+			if _lean_turning:
+				return ACTION_TURN_RIGHT if _lean_vel_x > 0.0 else ACTION_TURN_LEFT
+		return ACTION_NEUTRAL
+
+# Display-only pose values for the mannequin
+var pose_squat_y: float:           # visual squat scale from jump charge (1 = standing)
+	get: return lerpf(1.0, charge_squat_scale, _charge_timer / charge_max_time)
+var pose_flip_angle: float:        # Jerry's visible pitch (rad, + = nose-down), 0 while under pose_tilt_threshold_deg
+	get:
+		# mesh_pivot.rotation.x is what the 3D model actually shows (lean, flips, wipeout); negative = forward
+		var pitch := -wrapf(mesh_pivot.rotation.x, -PI, PI)
+		return pitch if absf(pitch) > deg_to_rad(pose_tilt_threshold_deg) else 0.0
+
 # Per-tick caches, refreshed at the top of _physics_process (rail also refreshed after move_and_slide)
 var _turn_input: float = 0.0
 var _lean_input: float = 0.0
@@ -212,6 +266,10 @@ func _physics_process(delta: float) -> void:
 
 	# Recover lean contribution after collision response
 	_lean_vel_x = velocity.x - sin(_board_yaw) * GameManager.current_speed
+	if absf(_lean_vel_x) > LEAN_TURN_ENTER:
+		_lean_turning = true
+	elif absf(_lean_vel_x) < LEAN_TURN_EXIT:
+		_lean_turning = false
 
 	if not is_on_floor():
 		_air_time += delta
@@ -663,6 +721,7 @@ func _handle_lean_back(delta: float) -> void:
 
 func _start_wipeout() -> void:
 	_is_wiping_out = true
+	_lean_turning = false
 	_wipeout_timer = wipeout_duration
 	_wipeout_phase3_triggered = false
 	_yaw_recovery = false
@@ -888,6 +947,7 @@ func _apply_appearance() -> void:
 
 
 func _on_game_started() -> void:
+	_lean_turning = false
 	_trick_had_rail = false
 	_trick_finalize_timer = 0.0
 	_pending_trick_spin = 0.0

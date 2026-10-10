@@ -10,6 +10,9 @@ extends CanvasLayer
 @onready var _controls_screen: Control = $ControlsScreen
 @onready var _pause_screen: Control = $PauseScreen
 
+const Mannequin = preload("res://scripts/ui/mannequin.gd")
+const MANNEQUIN_LAYER := 3   # above the posterize CanvasLayer (layer 2) so the widget stays crisp
+
 const SCREEN_OVERLAY_COLOR := Color(0.15, 0.15, 0.15, 0.3)
 
 # Palette
@@ -94,8 +97,8 @@ const TRICK_ANCHORS := Vector4(1.0, 1.0, 1.0, 1.0)
 const TRICK_OFFSETS := Vector4(-347.0, -105.0, -12.0, -55.0)
 const FUN_HAD_ANCHORS := Vector4(1.0, 1.0, 1.0, 1.0)
 const FUN_HAD_OFFSETS := Vector4(-347.0, -50.0, -12.0, -12.0)
-const TUTORIAL_ANCHORS := Vector4(0.1, 0.82, 0.9, 0.95)
-const AFTERNOON_ANCHORS := Vector4(0.1, 0.88, 0.9, 0.96)
+const TUTORIAL_ANCHORS := Vector4(0.11, 0.82, 0.9, 0.95)   # left edge clears the mannequin widget
+const AFTERNOON_ANCHORS := Vector4(0.11, 0.88, 0.9, 0.96)  # left edge clears the mannequin widget
 const CLOSE_CALL_ANCHORS := Vector4(0.0, 0.5, 0.5, 0.5)
 const CLOSE_CALL_OFFSETS := Vector4(18.0, -16.0, 300.0, 16.0)
 
@@ -322,6 +325,10 @@ func _ready() -> void:
 	add_child(_close_call_label)
 
 	_player = get_tree().get_first_node_in_group("player")
+	var mannequin_layer := CanvasLayer.new()
+	mannequin_layer.layer = MANNEQUIN_LAYER
+	add_child(mannequin_layer)
+	mannequin_layer.add_child(Mannequin.new())  # finds the player via the "player" group
 	if _player:
 		_player.stance_changed.connect(_on_stance_changed)
 		_player.wipeout_danger.connect(_on_wipeout_danger)
