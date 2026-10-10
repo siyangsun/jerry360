@@ -24,8 +24,11 @@ const GAMEPLAY_SONGS: Array[String] = [
 ]
 
 const VOLUME_DB := -3.1
+const WIFE_DUCK_DB := -12.0        # gameplay music drop while the wife call clip plays
+const DUCK_FADE_TIME := 0.25       # s to fade down / back up
 
 var _song_queue: Array[String] = []
+var _duck_tween: Tween
 
 
 func _ready() -> void:
@@ -71,7 +74,18 @@ func _play_random_gameplay_song() -> void:
 	song_changed.emit(path.get_file().get_basename())
 
 
+## Fades gameplay music down (on) or back to VOLUME_DB (off). Runs while paused too.
+func duck(on: bool) -> void:
+	if _duck_tween:
+		_duck_tween.kill()
+	_duck_tween = create_tween()
+	_duck_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_duck_tween.tween_property(_game_player, "volume_db", VOLUME_DB + (WIFE_DUCK_DB if on else 0.0), DUCK_FADE_TIME)
+
+
 func _on_state_changed(new_state: GameManager.State) -> void:
+	if new_state == GameManager.State.MENU or new_state == GameManager.State.DEAD:
+		duck(false)  # safety net: never carry a duck out of a run
 	match new_state:
 		GameManager.State.MENU:
 			_switch_to(_menu_player, [_game_player, _death_player, _wife_death_player])

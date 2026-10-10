@@ -43,6 +43,10 @@ const CONTROLS_DATA: Array[Dictionary] = [
 
 const LAP_DISTANCE := 1000.0
 const WIFE_CALL_TEXT := "Hi honey, are you having fun?"
+const WIFE_CALL_CLIPS: Array[String] = [
+	"res://assets/audio/sfx/are you having fun.mp3",
+	"res://assets/audio/sfx/are you having fun2.mp3",
+]
 const WIFE_KILL_TEXT := "No? Aww, I'm sorry. Come home whenever you get the chance!"
 
 const CLOSE_CALL_DISPLAY_TIME := 2.5
@@ -175,6 +179,9 @@ var _now_playing_label: Label
 var _wife_label: Label
 var _woohoo_label: Label
 var _wife_audio: AudioStreamPlayer
+var _wife_clips: Array[AudioStream] = []
+var _wife_clip_idx: int = 0        # rotates through _wife_clips each call (per session)
+var _wife_clip_active: bool = false  # clip started and not yet finished/stopped (true while paused too)
 var _wow_label: Label
 var _wow_timer: float = 0.0
 var _wife_call_active: bool = false
@@ -272,8 +279,12 @@ func _ready() -> void:
 	add_child(_woohoo_label)
 
 	_wife_audio = AudioStreamPlayer.new()
-	_wife_audio.stream = preload("res://assets/audio/sfx/are you having fun.mp3")
 	add_child(_wife_audio)
+	_wife_audio.finished.connect(_end_wife_clip)
+	# load() not preload(): a clip that hasn't been imported yet is skipped instead of breaking the HUD
+	for path in WIFE_CALL_CLIPS:
+		if ResourceLoader.exists(path):
+			_wife_clips.append(load(path))
 
 	MusicManager.song_changed.connect(_on_song_changed)
 	ScoreManager.combo_changed.connect(_on_combo_changed)
@@ -544,6 +555,7 @@ func _on_combo_changed(count: int, multiplier: float) -> void:
 
 
 func _on_state_changed(new_state: GameManager.State) -> void:
+	_sync_wife_clip(new_state)
 	menu_screen.visible = new_state == GameManager.State.MENU
 	_game_mode_screen.visible = false
 	_customize_screen.visible = false
@@ -862,7 +874,35 @@ func _on_wife_calling() -> void:
 	_wife_call_active = true
 	_wife_call_timer = wife_call_display_time
 	_wife_label.visible = true
-	_wife_audio.play()
+	if not _wife_clips.is_empty():
+		_wife_audio.stream = _wife_clips[_wife_clip_idx % _wife_clips.size()]
+		_wife_clip_idx += 1
+		_wife_audio.play()
+		_wife_clip_active = true
+		MusicManager.duck(true)
+
+
+## Wife clip follows the game state: pauses with the game (music un-ducks while paused),
+## resumes ducked, and is cut on menu/death so the music is never left quiet.
+func _sync_wife_clip(new_state: GameManager.State) -> void:
+	if not _wife_clip_active:
+		return
+	match new_state:
+		GameManager.State.PLAYING:
+			_wife_audio.stream_paused = false
+			MusicManager.duck(true)
+		GameManager.State.PAUSED:
+			_wife_audio.stream_paused = true
+			MusicManager.duck(false)
+		_:
+			_wife_audio.stop()
+			_end_wife_clip()
+
+
+func _end_wife_clip() -> void:
+	_wife_clip_active = false
+	_wife_audio.stream_paused = false
+	MusicManager.duck(false)
 
 
 func _resolve_wife_call() -> void:

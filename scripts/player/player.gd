@@ -177,8 +177,11 @@ const ACTIONS: Array[StringName] = [
 ]
 const LEAN_TURN_ENTER := 1.0       # |lean velocity| (m/s) that starts a lean-turn action
 const LEAN_TURN_EXIT := 0.6        # ...and drops below which it ends (hysteresis)
+const GRAB_POSE_DELAY := 0.08      # s past grab_threshold before the grab pose shows (earning still needs grab_hold_time)
+const GRAB_POSE_EXIT_FRACTION := 0.7  # grab pose drops when |lean| falls below this fraction of grab_threshold
 
 var _lean_turning: bool = false    # lean-turn hysteresis state, updated each physics tick
+var _grab_pose_side: int = 0       # grab-pose hysteresis: +1 / -1 rider-relative side while showing, 0 = off
 
 ## Shauna's priority list, first match wins:
 ## wipeout > grab > spin > rail > brake > turn > neutral.
@@ -187,8 +190,8 @@ var current_action: StringName:
 		if _is_wiping_out or _is_dead:
 			return ACTION_WIPEOUT
 		var on_floor := is_on_floor()
-		if not on_floor and _grab_earned != 0:
-			var frontside := (_grab_earned > 0) != is_goofy  # goofy swaps front/back
+		if _grab_pose_side != 0:
+			var frontside := (_grab_pose_side > 0) != is_goofy  # goofy swaps front/back
 			return ACTION_GRAB_FRONT if frontside else ACTION_GRAB_BACK
 		if (not on_floor or _on_rail) and _turn_input != 0.0:
 			return ACTION_SPIN_RIGHT if _turn_input > 0.0 else ACTION_SPIN_LEFT
@@ -279,6 +282,7 @@ func _physics_process(delta: float) -> void:
 
 	_apply_wall_gravity(delta)
 	_handle_air_spin(delta)
+	_update_grab_pose()
 	_handle_landing()
 	_tick_trick_finalize(delta)
 	_handle_lean_forward(delta)
@@ -722,6 +726,7 @@ func _handle_lean_back(delta: float) -> void:
 func _start_wipeout() -> void:
 	_is_wiping_out = true
 	_lean_turning = false
+	_grab_pose_side = 0
 	_wipeout_timer = wipeout_duration
 	_wipeout_phase3_triggered = false
 	_yaw_recovery = false
@@ -792,6 +797,16 @@ func _handle_wipeout(delta: float) -> void:
 
 	if _wipeout_timer <= 0.0:
 		_end_wipeout()
+
+
+## Grab-pose hysteresis (display only; _grab_earned still drives scoring). Runs after _handle_air_spin
+## so _grab_timer is current. The flag, not the timer, carries the pose through dips between exit and threshold.
+func _update_grab_pose() -> void:
+	var lean := absf(_lean_vel_x)
+	if is_on_floor() or _on_rail or lean < grab_threshold * GRAB_POSE_EXIT_FRACTION:
+		_grab_pose_side = 0
+	elif _grab_pose_side == 0 and lean >= grab_threshold and _grab_timer >= GRAB_POSE_DELAY:
+		_grab_pose_side = 1 if _lean_vel_x > 0.0 else -1
 
 
 func _end_wipeout() -> void:
@@ -948,6 +963,7 @@ func _apply_appearance() -> void:
 
 func _on_game_started() -> void:
 	_lean_turning = false
+	_grab_pose_side = 0
 	_trick_had_rail = false
 	_trick_finalize_timer = 0.0
 	_pending_trick_spin = 0.0

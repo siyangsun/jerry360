@@ -19,6 +19,9 @@ const MIN_POSE_HOLD := 0.12                 # s; display hold for every action b
 const PlayerScript = preload("res://scripts/player/player.gd")
 # Which actions loop fast / don't loop / mirror for goofy is a display choice, so it lives here
 const SPIN_ACTIONS: Array[StringName] = [PlayerScript.ACTION_SPIN_LEFT, PlayerScript.ACTION_SPIN_RIGHT]
+const HOLD_EXEMPT_ACTIONS: Array[StringName] = [  # entering these skips MIN_POSE_HOLD
+	PlayerScript.ACTION_WIPEOUT, PlayerScript.ACTION_GRAB_FRONT, PlayerScript.ACTION_GRAB_BACK,
+]
 const NO_LOOP_ACTIONS: Array[StringName] = [PlayerScript.ACTION_WIPEOUT]
 const GOOFY_FLIP_ACTIONS: Array[StringName] = [PlayerScript.ACTION_NEUTRAL, PlayerScript.ACTION_GRIND, PlayerScript.ACTION_BRAKE]
 
@@ -88,7 +91,7 @@ func _process(delta: float) -> void:
 
 	var wanted := player.current_action
 	_shown_time += delta
-	if wanted != _shown and (wanted == PlayerScript.ACTION_WIPEOUT or _shown_time >= MIN_POSE_HOLD):
+	if wanted != _shown and (wanted in HOLD_EXEMPT_ACTIONS or _shown_time >= MIN_POSE_HOLD):
 		_shown = wanted
 		_shown_time = 0.0  # frame index derives from this, so it resets only on a name change
 
