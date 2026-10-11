@@ -4,7 +4,7 @@ extends Node3D
 const LevelGenerator = preload("res://scripts/world/level_generator.gd")
 
 @export var player: CharacterBody3D
-@export var offset := Vector3(0.0, 3.0, 6.0)        # behind and above
+@export var offset := Vector3(0.0, 3.0, 4.6)        # behind and above (closer than original, same height)
 @export var look_offset := Vector3(0.0, 0.0, -12.0) # point ahead of player
 @export var follow_speed := 8.0
 @export var lateral_follow_speed := 12.0

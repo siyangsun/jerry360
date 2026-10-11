@@ -80,6 +80,19 @@ const POLE_AREA_SIZE    := Vector3(0.55, 2.0, 0.55)  # crash box covering the lo
 const POLE_AREA_CENTER_Y := 1.0    # height of the crash box center above the pole base
 const POLE_NEAR_RADIUS  := 1.8     # close-call sphere radius
 
+# Park fences — run along the top of each bank; posts lean like trees/signs/poles
+const FENCE_POST_SPACING := 2.3    # meters between fence posts (shrinks on steep runs so the step never exceeds FENCE_MAX_STEP)
+const FENCE_MAX_STEP     := 0.72   # most a rail is allowed to step down at each post
+const FENCE_RAIL_ANGLE_SCALE := 0.5  # rail pitch as a fraction of the post lean (1 = square to posts, 0 = flat along the snow)
+const FENCE_POST_WIDTH   := 0.10   # width and depth of each post
+const FENCE_POST_HEIGHT  := 1.4    # how tall each post is
+const FENCE_POST_SINK    := 0.1    # how far the post base sits into the bank
+const FENCE_RAIL_THICK   := 0.06   # thickness of each horizontal rail
+const FENCE_RAIL_HEIGHTS := [0.27, 0.65]  # height of each rail where it leaves the uphill post (it's higher by one step at the next post)
+const FENCE_EDGE_INSET   := 0.26   # how far in from the outer lip of the bank the fence stands
+const FENCE_COLLISION_THICK := 0.4 # depth of the solid wall Jerry bumps into (wider than posts so he can't clip through at speed)
+const FENCE_RAIL_COLOR   := Color(1.0, 0.42, 0.05)   # resort-boundary orange
+
 # Upright terrain tilt — leans obstacles toward the camera to sell the downhill slope illusion
 const DOWNHILL_TILT_ANGLE := 20.0  # degrees of tilt; higher = more dramatic perceived slope
 
@@ -144,6 +157,7 @@ const MAT_FOLIAGE   := &"foliage"
 const MAT_ROCK      := &"rock"
 const MAT_POLE      := &"pole"
 const MAT_LAP       := &"lap"
+const MAT_FENCE_RAIL := &"fence_rail"
 const MESH_TRUNK      := &"trunk"
 const MESH_FOLIAGE    := &"foliage"
 const MESH_BUSH       := &"bush"
@@ -154,6 +168,7 @@ const MESH_POLE_SHAFT := &"pole_shaft"
 const MESH_POLE_BAR   := &"pole_bar"
 const MESH_ROCK_BODY  := &"rock_body"  # built at radius 1; scaled per crystal
 const MESH_ROCK_CAP   := &"rock_cap"   # built at radius 1; scaled per crystal
+const MESH_FENCE_POST := &"fence_post"
 const SHAPE_TREE_HIT  := &"tree_hit"
 const SHAPE_TREE_NEAR := &"tree_near"
 const SHAPE_BUSH_HIT  := &"bush_hit"
@@ -203,6 +218,7 @@ const LEVELS := [
 	{
 		"name": "THE PARK",
 		"chunks": 5,
+		"fence": true,
 		"tree": 0.05, "rail": 0.40, "mogul": 0.00, "ramp": 0.40, "bush": 0.00, "rock": 0.00,
 	},
 	{
@@ -381,6 +397,10 @@ func _make_chunk(cfg: Dictionary) -> Node3D:
 		true
 	))
 
+	if cfg.get("fence", false):
+		root.add_child(_make_fence(-1.0))
+		root.add_child(_make_fence(1.0))
+
 	_maybe_add_obstacles(root, cfg)
 	var _lap_chunk_size := TUTORIAL_LAP_CHUNKS if GameManager.is_tutorial else LAP_CHUNKS
 	if _chunk_count % _lap_chunk_size == 0:
@@ -501,6 +521,8 @@ static func _build_material(id: StringName) -> StandardMaterial3D:
 			mat.albedo_color = POLE_COLOR
 			mat.roughness = POLE_ROUGHNESS
 			mat.metallic = POLE_METALLIC
+		MAT_FENCE_RAIL:
+			mat.albedo_color = FENCE_RAIL_COLOR
 		MAT_LAP:
 			mat.albedo_color = LAP_MARKER_COLOR
 			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -531,6 +553,8 @@ static func _build_mesh(id: StringName) -> Mesh:
 			return _make_box_mesh(Vector3(POLE_SHAFT_WIDTH, POLE_SHAFT_HEIGHT, POLE_SHAFT_WIDTH))
 		MESH_POLE_BAR:
 			return _make_box_mesh(Vector3(POLE_BAR_LENGTH, POLE_BAR_HEIGHT, POLE_BAR_DEPTH))
+		MESH_FENCE_POST:
+			return _make_box_mesh(Vector3(FENCE_POST_WIDTH, FENCE_POST_HEIGHT, FENCE_POST_WIDTH))
 		MESH_ROCK_BODY:
 			return _make_cylinder_mesh(1.0, 1.0, ROCK_BODY_HEIGHT_FACTOR, ROCK_SEGMENTS)
 		MESH_ROCK_CAP:
@@ -1108,6 +1132,56 @@ func _make_pole(pos: Vector3) -> Node3D:
 	root.add_child(area)
 
 	return root
+
+
+# Solid fence along the top of one bank (side = -1 left, 1 right).
+func _make_fence(side: float) -> StaticBody3D:
+	var root := StaticBody3D.new()
+	var along := WALL_WIDTH - FENCE_EDGE_INSET
+	root.position = Vector3(side * (_active_floor_width * 0.5 + along * cos(WALL_ANGLE)), along * sin(WALL_ANGLE), 0.0)
+	var tilt := deg_to_rad(_active_tilt_angle)
+	var upright := Basis(Vector3.RIGHT, tilt)  # same lean as trees/signs/poles
+	var rail_pitch := tilt * FENCE_RAIL_ANGLE_SCALE
+	var rail_basis := Basis(Vector3.RIGHT, rail_pitch)
+	# Rail climbs `step` up the next post over `spacing`: step = spacing * sin(pitch) / cos(tilt - pitch)
+	var step_per_meter := sin(rail_pitch) / cos(tilt - rail_pitch)
+	# Posts divide the chunk evenly so the pattern lines up across chunk seams
+	var post_count := ceili(CHUNK_LENGTH / minf(FENCE_POST_SPACING, FENCE_MAX_STEP / step_per_meter))
+	var spacing := CHUNK_LENGTH / post_count
+	# Each rail runs from one post until it meets the next post downhill, then steps down
+	var rail_length := spacing * cos(tilt) / cos(tilt - rail_pitch)
+
+	var posts: Array[Transform3D] = []
+	var rails: Array[Transform3D] = []
+	for i in range(post_count):
+		var base := Vector3(0.0, 0.0, -i * spacing)
+		posts.append(Transform3D(upright, base + upright * Vector3(0.0, FENCE_POST_HEIGHT * 0.5 - FENCE_POST_SINK, 0.0)))
+		for h: float in FENCE_RAIL_HEIGHTS:
+			rails.append(Transform3D(rail_basis, base + upright * Vector3(0.0, h, 0.0) + rail_basis * Vector3(0.0, 0.0, -rail_length * 0.5)))
+	root.add_child(_make_multimesh(_mesh(MESH_FENCE_POST), _material(MAT_SIGN_POST), posts))
+	root.add_child(_make_multimesh(_box_mesh(Vector3(FENCE_RAIL_THICK, FENCE_RAIL_THICK, rail_length)), _material(MAT_FENCE_RAIL), rails))
+
+	# One upright box the full chunk length; the tilt only shifts the fence along Z, which the box already spans
+	var wall_h := FENCE_POST_HEIGHT * cos(tilt) - FENCE_POST_SINK
+	var col := CollisionShape3D.new()
+	col.shape = _box_shape(Vector3(FENCE_COLLISION_THICK, wall_h, CHUNK_LENGTH))
+	col.position = Vector3(0.0, wall_h * 0.5, -CHUNK_LENGTH * 0.5)
+	root.add_child(col)
+
+	return root
+
+
+func _make_multimesh(mesh: Mesh, mat: Material, transforms: Array[Transform3D]) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = transforms.size()
+	for i in range(transforms.size()):
+		mm.set_instance_transform(i, transforms[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = mat
+	return mmi
 
 
 func _make_lap_marker() -> MeshInstance3D:
