@@ -113,7 +113,7 @@ const FONT_SIZE_NOW_PLAYING := 17
 const FONT_SIZE_SKIP := 21
 const FONT_SIZE_WOW := 18
 const FONT_SIZE_WIFE := 20
-const FONT_SIZE_FUN_HAD := 18
+const FONT_SIZE_FUN_HAD := 22
 const FONT_SIZE_TUTORIAL := 16
 const FONT_SIZE_AFTERNOON := 14
 const FONT_SIZE_CLOSE_CALL := 22
@@ -128,7 +128,7 @@ const FONT_SIZE_STICKER := 20
 const FONT_SIZE_SETTINGS_ROW := 20
 
 # Layout: anchors are Vector4(left, top, right, bottom); offsets use the same order
-const LEVEL_POSITION := Vector2(8.0, 8.0)
+const LEVEL_POSITION := Vector2(16.0, 20.0)
 const COMBO_TOP_Y := 16.0
 const DANGER_TOP_Y := 48.0
 const GOOFY_ANCHORS := Vector4(0.5, 0.0, 0.5, 0.0)
@@ -184,7 +184,7 @@ const TITLE_SPIN_TIME := 0.9
 # Splashes: right one is a random tagline, left one is fixed; click either and it fades away until next visit
 const SPLASH_ANCHORS := Vector4(0.5, 0.0, 0.5, 0.0)
 const SPLASH_OFFSETS := Vector4(130.0, 345.0, 490.0, 380.0)        # tucked under the right end of the title
-const SPLASH_LEFT_OFFSETS := Vector4(-500.0, 230.0, -140.0, 265.0)  # above the left end of the title
+const SPLASH_LEFT_OFFSETS := Vector4(-610.0, 300.0, -250.0, 335.0)  # beside the left end of the title, clear of the story
 const SPLASH_ROTATION := -PI / 14.0
 const SPLASH_LEFT_TEXT := "it's really fun apparently!"
 const SPLASH_FADE_TIME := 0.4
