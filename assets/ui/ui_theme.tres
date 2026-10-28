@@ -1,0 +1,62 @@
+[gd_resource type="Theme" load_steps=6 format=3]
+
+[sub_resource type="StyleBoxFlat" id="Button_normal"]
+bg_color = Color(0.08, 0.05, 0.1, 0.55)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.7)
+
+[sub_resource type="StyleBoxFlat" id="Button_hover"]
+bg_color = Color(0.08, 0.05, 0.1, 0.75)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.82, 0.1, 1)
+
+[sub_resource type="StyleBoxFlat" id="Button_pressed"]
+bg_color = Color(1, 0.82, 0.1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.82, 0.1, 1)
+
+[sub_resource type="StyleBoxEmpty" id="Empty"]
+
+[sub_resource type="FontVariation" id="Font_title"]
+spacing_glyph = 5
+
+[resource]
+Button/colors/font_color = Color(1, 1, 1, 0.92)
+Button/colors/font_focus_color = Color(1, 1, 1, 0.92)
+Button/colors/font_hover_color = Color(1, 0.82, 0.1, 1)
+Button/colors/font_hover_pressed_color = Color(0.08, 0.05, 0.1, 1)
+Button/colors/font_pressed_color = Color(0.08, 0.05, 0.1, 1)
+Button/font_sizes/font_size = 20
+Button/styles/focus = SubResource("Empty")
+Button/styles/hover = SubResource("Button_hover")
+Button/styles/hover_pressed = SubResource("Button_pressed")
+Button/styles/normal = SubResource("Button_normal")
+Button/styles/pressed = SubResource("Button_pressed")
+CheckButton/colors/font_color = Color(1, 0.82, 0.1, 1)
+CheckButton/colors/font_focus_color = Color(1, 0.82, 0.1, 1)
+CheckButton/colors/font_hover_color = Color(1, 0.82, 0.1, 1)
+CheckButton/colors/font_hover_pressed_color = Color(1, 0.82, 0.1, 1)
+CheckButton/colors/font_pressed_color = Color(1, 0.82, 0.1, 1)
+CheckButton/font_sizes/font_size = 20
+CheckButton/styles/focus = SubResource("Empty")
+CheckButton/styles/hover = SubResource("Empty")
+CheckButton/styles/hover_pressed = SubResource("Empty")
+CheckButton/styles/normal = SubResource("Empty")
+CheckButton/styles/pressed = SubResource("Empty")
+HudTitle/base_type = &"Label"
+HudTitle/colors/font_color = Color(1, 0.82, 0.1, 1)
+HudTitle/colors/font_outline_color = Color(1, 0.97, 0.55, 1)
+HudTitle/colors/font_shadow_color = Color(0.35, 0.2, 0, 1)
+HudTitle/constants/outline_size = 2
+HudTitle/constants/shadow_offset_x = 2
+HudTitle/constants/shadow_offset_y = 2
+HudTitle/fonts/font = SubResource("Font_title")

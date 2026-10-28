@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/menu_screen.gd" id="1_menu"]
+[ext_resource type="Theme" path="res://assets/ui/ui_theme.tres" id="2_theme"]
+
+[node name="MenuScreen" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_menu")
+
+[node name="BackstoryLabel" type="RichTextLabel" parent="."]
+anchor_left = 0.05
+anchor_top = 0.04
+anchor_right = 0.95
+anchor_bottom = 0.38
+mouse_filter = 2
+bbcode_enabled = true
+scroll_active = false
+text = "[center]Jerry. Age 34. Former tax accountant.
+Fired on a Tuesday.
+
+He found his late grandfather's snowboard in the garage.
+He drove to the mountain. He pointed it downhill.
+
+[color=#ff730d]That was three weeks ago. Jerry has not stopped.[/color][/center]"
+theme_override_font_sizes/normal_font_size = 18
+
+[node name="Buttons" type="VBoxContainer" parent="."]
+anchor_left = 0.38
+anchor_top = 0.58
+anchor_right = 0.62
+anchor_bottom = 0.905
+theme_override_constants/separation = 11
+
+[node name="PunchPassButton" type="Button" parent="Buttons"]
+size_flags_vertical = 3
+text = "Punch Your Pass"
+
+[node name="HowToPlayButton" type="Button" parent="Buttons"]
+size_flags_vertical = 3
+text = "How to Play"
+
+[node name="LodgeButton" type="Button" parent="Buttons"]
+size_flags_vertical = 3
+text = "Stop by Lodge"
+
+[node name="SettingsButton" type="Button" parent="Buttons"]
+size_flags_vertical = 3
+text = "Fiddle With Knobs"

@@ -1,0 +1,43 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_mode_screen.gd" id="1_mode"]
+[ext_resource type="Theme" path="res://assets/ui/ui_theme.tres" id="2_theme"]
+
+[node name="GameModeScreen" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_mode")
+
+[node name="PoisonLabel" type="Label" parent="."]
+anchor_top = 0.38
+anchor_right = 1.0
+anchor_bottom = 0.58
+theme_type_variation = &"HudTitle"
+theme_override_font_sizes/font_size = 48
+text = "pick your poison"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Buttons" type="VBoxContainer" parent="."]
+anchor_left = 0.38
+anchor_top = 0.6
+anchor_right = 0.62
+anchor_bottom = 0.76
+theme_override_constants/separation = 14
+
+[node name="StartButton" type="Button" parent="Buttons"]
+size_flags_vertical = 3
+text = "Start Shredding?"
+
+[node name="LearnButton" type="Button" parent="Buttons"]
+size_flags_vertical = 3
+text = "Learn the Slopes"
+
+[node name="BackButton" type="Button" parent="."]
+anchor_left = 0.38
+anchor_top = 0.87
+anchor_right = 0.62
+anchor_bottom = 0.94
+text = "< Back"

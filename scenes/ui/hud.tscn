@@ -1,19 +1,14 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
-
-[sub_resource type="FontVariation" id="Font_bold"]
-spacing_glyph = 5
-
-[sub_resource type="Theme" id="Theme_title"]
-HudTitle/base_type = &"Label"
-HudTitle/colors/font_color = Color(1.0, 0.82, 0.1, 1)
-HudTitle/colors/font_outline_color = Color(1.0, 0.97, 0.55, 1)
-HudTitle/colors/font_shadow_color = Color(0.35, 0.2, 0.0, 1)
-HudTitle/constants/outline_size = 2
-HudTitle/constants/shadow_offset_x = 2
-HudTitle/constants/shadow_offset_y = 2
-HudTitle/fonts/font = SubResource("Font_bold")
+[ext_resource type="PackedScene" path="res://scenes/ui/menu_screen.tscn" id="2_menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_mode_screen.tscn" id="3_mode"]
+[ext_resource type="PackedScene" path="res://scenes/ui/controls_screen.tscn" id="4_controls"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings_screen.tscn" id="5_settings"]
+[ext_resource type="PackedScene" path="res://scenes/ui/death_screen.tscn" id="6_death"]
+[ext_resource type="PackedScene" path="res://scenes/ui/pause_screen.tscn" id="7_pause"]
+[ext_resource type="PackedScene" path="res://scenes/ui/lodge_screen.tscn" id="8_lodge"]
+[ext_resource type="Script" path="res://scripts/ui/mannequin.gd" id="9_mannequin"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -26,191 +21,28 @@ offset_bottom = 166.0
 text = "0 m\n0 m/s\n0:00\nBest --:--"
 visible = false
 
-[node name="MenuScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="MenuScreen" parent="." instance=ExtResource("2_menu")]
 
-[node name="BackstoryLabel" type="RichTextLabel" parent="MenuScreen"]
-anchor_left = 0.05
-anchor_top = 0.04
-anchor_right = 0.95
-anchor_bottom = 0.38
-mouse_filter = 2
-bbcode_enabled = true
-scroll_active = false
-text = "[center]Jerry. Age 34. Former tax accountant.
-Fired on a Tuesday.
-
-He found his late grandfather's snowboard in the garage.
-He drove to the mountain. He pointed it downhill.
-
-[color=#ff730d]That was three weeks ago. Jerry has not stopped.[/color][/center]"
-theme_override_font_sizes/normal_font_size = 18
-
-[node name="PunchPassButton" type="Button" parent="MenuScreen"]
-anchor_left = 0.38
-anchor_top = 0.58
-anchor_right = 0.62
-anchor_bottom = 0.65
-text = "Punch Your Pass"
-
-[node name="HowToPlayButton" type="Button" parent="MenuScreen"]
-anchor_left = 0.38
-anchor_top = 0.665
-anchor_right = 0.62
-anchor_bottom = 0.735
-text = "How to Play"
-
-[node name="CustomizeButton" type="Button" parent="MenuScreen"]
-anchor_left = 0.38
-anchor_top = 0.75
-anchor_right = 0.62
-anchor_bottom = 0.82
-text = "Stop by Lodge"
-
-[node name="SettingsButton" type="Button" parent="MenuScreen"]
-anchor_left = 0.38
-anchor_top = 0.835
-anchor_right = 0.62
-anchor_bottom = 0.905
-text = "Fiddle With Knobs"
-
-[node name="GameModeScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="GameModeScreen" parent="." instance=ExtResource("3_mode")]
 visible = false
 
-[node name="PoisonLabel" type="Label" parent="GameModeScreen"]
-anchor_left = 0.0
-anchor_top = 0.38
-anchor_right = 1.0
-anchor_bottom = 0.58
-text = "pick your poison"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 48
-theme = SubResource("Theme_title")
-theme_type_variation = &"HudTitle"
-
-[node name="StartButton" type="Button" parent="GameModeScreen"]
-anchor_left = 0.38
-anchor_top = 0.60
-anchor_right = 0.62
-anchor_bottom = 0.67
-text = "Start Shredding?"
-
-[node name="LearnButton" type="Button" parent="GameModeScreen"]
-anchor_left = 0.38
-anchor_top = 0.69
-anchor_right = 0.62
-anchor_bottom = 0.76
-text = "Learn the Slopes"
-
-[node name="BackButton" type="Button" parent="GameModeScreen"]
-anchor_left = 0.38
-anchor_top = 0.87
-anchor_right = 0.62
-anchor_bottom = 0.94
-text = "< Back"
-
-[node name="DeathScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="ControlsScreen" parent="." instance=ExtResource("4_controls")]
 visible = false
 
-[node name="GrayOverlay" type="ColorRect" parent="DeathScreen"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-
-[node name="DeathLabel" type="Label" parent="DeathScreen"]
-anchor_left = 0.05
-anchor_top = 0.04
-anchor_right = 0.95
-anchor_bottom = 0.38
-text = ""
-horizontal_alignment = 1
-vertical_alignment = 0
-autowrap_mode = 3
-theme_override_font_sizes/font_size = 14
-
-[node name="TitleLabel" type="Label" parent="DeathScreen"]
-anchor_left = 0.0
-anchor_top = 0.38
-anchor_right = 1.0
-anchor_bottom = 0.68
-text = "JERRY360"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 96
-theme = SubResource("Theme_title")
-theme_type_variation = &"HudTitle"
-
-[node name="TryAgainButton" type="Button" parent="DeathScreen"]
-anchor_left = 0.38
-anchor_top = 0.70
-anchor_right = 0.62
-anchor_bottom = 0.78
-text = "Try Again?"
-
-[node name="CustomizeScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="SettingsScreen" parent="." instance=ExtResource("5_settings")]
 visible = false
 
-[node name="ControlsScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="DeathScreen" parent="." instance=ExtResource("6_death")]
 visible = false
 
-[node name="SettingsScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="PauseScreen" parent="." instance=ExtResource("7_pause")]
 visible = false
 
-[node name="PauseScreen" type="Control" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="CleanLayer" type="CanvasLayer" parent="."]
+layer = 3
+
+[node name="Mannequin" type="Control" parent="CleanLayer"]
+script = ExtResource("9_mannequin")
+
+[node name="LodgeScreen" parent="CleanLayer" instance=ExtResource("8_lodge")]
 visible = false
-
-[node name="DarkOverlay" type="ColorRect" parent="PauseScreen"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(0.1, 0.1, 0.1, 0.65)
-mouse_filter = 2
-
-[node name="PausedLabel" type="Label" parent="PauseScreen"]
-anchor_left = 0.0
-anchor_top = 0.28
-anchor_right = 1.0
-anchor_bottom = 0.52
-text = "PAUSED"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 64
-theme = SubResource("Theme_title")
-theme_type_variation = &"HudTitle"
-
-[node name="ResumeButton" type="Button" parent="PauseScreen"]
-anchor_left = 0.38
-anchor_top = 0.55
-anchor_right = 0.62
-anchor_bottom = 0.63
-text = "Resume"
-
-[node name="MenuButton" type="Button" parent="PauseScreen"]
-anchor_left = 0.38
-anchor_top = 0.65
-anchor_right = 0.62
-anchor_bottom = 0.73
-text = "Quit to Menu"
-
-[connection signal="pressed" from="MenuScreen/CustomizeButton" to="." method="_on_customize_pressed"]
-[connection signal="pressed" from="MenuScreen/PunchPassButton" to="." method="_on_punch_pass_pressed"]
-[connection signal="pressed" from="MenuScreen/SettingsButton" to="." method="_on_settings_pressed"]
-[connection signal="pressed" from="MenuScreen/HowToPlayButton" to="." method="_on_how_to_play_pressed"]
-[connection signal="pressed" from="GameModeScreen/StartButton" to="." method="_on_start_pressed"]
-[connection signal="pressed" from="GameModeScreen/LearnButton" to="." method="_on_learn_pressed"]
-[connection signal="pressed" from="GameModeScreen/BackButton" to="." method="_on_game_mode_back_pressed"]
-[connection signal="pressed" from="DeathScreen/TryAgainButton" to="." method="_on_try_again_pressed"]
-[connection signal="pressed" from="PauseScreen/ResumeButton" to="." method="_on_resume_pressed"]
-[connection signal="pressed" from="PauseScreen/MenuButton" to="." method="_on_menu_pressed"]
