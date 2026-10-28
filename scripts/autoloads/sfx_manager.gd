@@ -1,5 +1,7 @@
 extends Node
 
+const BUS := &"SFX"
+
 var _grind_player: AudioStreamPlayer
 var _snow_player: AudioStreamPlayer
 var _land_player: AudioStreamPlayer
@@ -21,6 +23,7 @@ func _make_player(path: String, loop: bool) -> AudioStreamPlayer:
 	stream.loop = loop
 	var player := AudioStreamPlayer.new()
 	player.stream = stream
+	player.bus = BUS
 	add_child(player)
 	return player
 

@@ -20,9 +20,9 @@ script = ExtResource("1_hud")
 
 [node name="DistanceLabel" type="Label" parent="."]
 offset_left = 8.0
-offset_top = 36.0
+offset_top = 64.0
 offset_right = 220.0
-offset_bottom = 136.0
+offset_bottom = 164.0
 text = "0 m\n0 m/s\n0:00\nBest --:--"
 visible = false
 
@@ -47,38 +47,33 @@ vertical_alignment = 0
 autowrap_mode = 3
 theme_override_font_sizes/font_size = 14
 
-[node name="TitleLabel" type="Label" parent="MenuScreen"]
-anchor_left = 0.0
-anchor_top = 0.38
-anchor_right = 1.0
-anchor_bottom = 0.68
-text = "JERRY360"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 96
-theme = SubResource("Theme_title")
-theme_type_variation = &"HudTitle"
-
 [node name="PunchPassButton" type="Button" parent="MenuScreen"]
 anchor_left = 0.38
-anchor_top = 0.68
+anchor_top = 0.58
 anchor_right = 0.62
-anchor_bottom = 0.75
+anchor_bottom = 0.65
 text = "Punch Your Pass"
 
 [node name="HowToPlayButton" type="Button" parent="MenuScreen"]
 anchor_left = 0.38
-anchor_top = 0.76
+anchor_top = 0.665
 anchor_right = 0.62
-anchor_bottom = 0.83
+anchor_bottom = 0.735
 text = "How to Play"
 
 [node name="CustomizeButton" type="Button" parent="MenuScreen"]
 anchor_left = 0.38
-anchor_top = 0.84
+anchor_top = 0.75
 anchor_right = 0.62
-anchor_bottom = 0.91
+anchor_bottom = 0.82
 text = "Stop by Lodge"
+
+[node name="SettingsButton" type="Button" parent="MenuScreen"]
+anchor_left = 0.38
+anchor_top = 0.835
+anchor_right = 0.62
+anchor_bottom = 0.905
+text = "Fiddle With Knobs"
 
 [node name="GameModeScreen" type="Control" parent="."]
 anchor_right = 1.0
@@ -167,6 +162,11 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 visible = false
 
+[node name="SettingsScreen" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+
 [node name="PauseScreen" type="Control" parent="."]
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -206,6 +206,7 @@ text = "Quit to Menu"
 
 [connection signal="pressed" from="MenuScreen/CustomizeButton" to="." method="_on_customize_pressed"]
 [connection signal="pressed" from="MenuScreen/PunchPassButton" to="." method="_on_punch_pass_pressed"]
+[connection signal="pressed" from="MenuScreen/SettingsButton" to="." method="_on_settings_pressed"]
 [connection signal="pressed" from="MenuScreen/HowToPlayButton" to="." method="_on_how_to_play_pressed"]
 [connection signal="pressed" from="GameModeScreen/StartButton" to="." method="_on_start_pressed"]
 [connection signal="pressed" from="GameModeScreen/LearnButton" to="." method="_on_learn_pressed"]

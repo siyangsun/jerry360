@@ -24,6 +24,7 @@ const GAMEPLAY_SONGS: Array[String] = [
 ]
 
 const VOLUME_DB := -3.1
+const BUS := &"Music"
 const WIFE_DUCK_DB := -12.0        # gameplay music drop while the wife call clip plays
 const DUCK_FADE_TIME := 0.25       # s to fade down / back up
 
@@ -37,10 +38,12 @@ func _ready() -> void:
 	_menu_player = AudioStreamPlayer.new()
 	_menu_player.stream = menu_stream
 	_menu_player.volume_db = VOLUME_DB
+	_menu_player.bus = BUS
 	add_child(_menu_player)
 
 	_game_player = AudioStreamPlayer.new()
 	_game_player.volume_db = VOLUME_DB
+	_game_player.bus = BUS
 	add_child(_game_player)
 	_game_player.finished.connect(_play_random_gameplay_song)
 
@@ -49,6 +52,7 @@ func _ready() -> void:
 	_death_player = AudioStreamPlayer.new()
 	_death_player.stream = death_stream
 	_death_player.volume_db = VOLUME_DB
+	_death_player.bus = BUS
 	add_child(_death_player)
 
 	var wife_death_stream := load(WIFE_DEATH_SONG) as AudioStreamMP3
@@ -56,6 +60,7 @@ func _ready() -> void:
 	_wife_death_player = AudioStreamPlayer.new()
 	_wife_death_player.stream = wife_death_stream
 	_wife_death_player.volume_db = VOLUME_DB
+	_wife_death_player.bus = BUS
 	add_child(_wife_death_player)
 
 	GameManager.state_changed.connect(_on_state_changed)

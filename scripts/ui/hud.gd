@@ -9,6 +9,7 @@ extends CanvasLayer
 @onready var _customize_screen: Control = $CustomizeScreen
 @onready var _controls_screen: Control = $ControlsScreen
 @onready var _pause_screen: Control = $PauseScreen
+@onready var _settings_screen: Control = $SettingsScreen
 
 const Mannequin = preload("res://scripts/ui/mannequin.gd")
 const ABOVE_POSTERIZE_LAYER := 3   # above the posterize CanvasLayer (layer 2): mannequin + lodge stay uncrunched
@@ -26,6 +27,27 @@ const COLOR_AFTERNOON := Color(1.0, 1.0, 1.0, 0.75)
 const COLOR_PREVIEW_LABEL := Color(1.0, 1.0, 1.0, 0.4)
 const COLOR_PREVIEW_PANEL := Color(0.06, 0.06, 0.10)
 const COLOR_VIGNETTE := Color(1.0, 0.0, 0.0, 0.0)
+const COLOR_INK := Color(0.08, 0.05, 0.1, 1.0)            # sticker text/border/shadow
+const COLOR_TITLE_OUTLINE := Color(1.0, 0.97, 0.55, 1.0)
+const COLOR_TITLE_SHADOW := Color(0.35, 0.2, 0.0, 1.0)
+const COLOR_SPLASH := Color(1.0, 1.0, 0.2, 1.0)
+const COLOR_STICKER_FILL := Color(0.08, 0.05, 0.1, 0.55)        # see-through dark, slope shows behind
+const COLOR_STICKER_FILL_HOVER := Color(0.08, 0.05, 0.1, 0.75)
+const COLOR_STICKER_EDGE := Color(1.0, 1.0, 1.0, 0.7)
+const COLOR_STICKER_TEXT := Color(1.0, 1.0, 1.0, 0.92)
+
+# Title screen splash: one picked at random every time the menu comes up
+const MENU_TAGLINES: Array[String] = [
+	"he cannot stop!",
+	"brakes sold separately",
+	"now with snow!",
+	"100% downhill",
+	"tax deductible?",
+	"fired on a Tuesday",
+	"grandpa's board!",
+	"regular footed, mostly",
+	"no poles!",
+]
 
 const CONTROLS_DATA: Array[Dictionary] = [
 	{"key": "Left / Right",        "desc": "Steer the board left and right"},
@@ -62,9 +84,28 @@ const CLOSE_CALL_PHRASES := [
 const SERIF_FONT_NAMES := ["Georgia", "Times New Roman", "Times", "serif"]
 const TRICK_FONT_NAMES := ["Georgia", "Times New Roman", "serif"]
 const MONO_FONT_NAMES := ["Consolas", "Courier New", "monospace"]
+const SIGN_FONT_NAMES := ["Bahnschrift", "Arial Narrow", "Impact", "sans-serif"]  # resort signage: condensed, bold
+const SIGN_FONT_WEIGHT := 700
+const SIGN_FONT_STRETCH := 75   # percent; condensed
+
+# Ski run sign (level name)
+const COLOR_SIGN_FACE := Color(0.96, 0.95, 0.9, 0.9)
+const COLOR_RUN_GREEN := Color(0.1, 0.6, 0.25)
+const COLOR_RUN_BLUE := Color(0.1, 0.3, 0.8)
+const SIGN_BORDER := 2
+const SIGN_CORNER_RADIUS := 4
+const SIGN_PADDING := Vector2(10.0, 6.0)
+const SIGN_SEPARATION := 8
+const SIGN_SYMBOL_SIZE := 18.0
+const SIGN_SYMBOL_GAP := 3
+# Trail difficulty by level number: green circle, blue square, black diamond, double black
+enum Run { GREEN, BLUE, BLACK, DOUBLE_BLACK }
+const RUN_THRESHOLDS: Array[int] = [1, 3, 5, 7]   # first level number at each Run rating
+const TUTORIAL_MAX_RUN := Run.BLUE
 
 # Font sizes
-const FONT_SIZE_LEVEL := 18
+const FONT_SIZE_LEVEL := 22
+const FONT_SIZE_LEVEL_NUMBER := 12
 const FONT_SIZE_COMBO := 24
 const FONT_SIZE_BANNER := 64        # GOOFY, WOOHOO
 const FONT_SIZE_CALLOUT := 28       # danger, nice air, trick
@@ -81,6 +122,10 @@ const FONT_SIZE_CONTROLS_ROW := 16
 const FONT_SIZE_CUSTOMIZE_TITLE := 36
 const FONT_SIZE_CUSTOMIZE_SECTION := 18
 const FONT_SIZE_PREVIEW := 13
+const FONT_SIZE_TITLE := 96
+const FONT_SIZE_SPLASH := 22
+const FONT_SIZE_STICKER := 20
+const FONT_SIZE_SETTINGS_ROW := 20
 
 # Layout: anchors are Vector4(left, top, right, bottom); offsets use the same order
 const LEVEL_POSITION := Vector2(8.0, 8.0)
@@ -128,6 +173,39 @@ const PREVIEW_BOARD_OFFSETS := Vector4(-13.0, -4.0, 13.0, 100.0)   # upright boa
 const PREVIEW_BOARD_ROTATION := -PI * 0.5  # nose left, so sprite text reads upright
 const CENTER_ANCHORS := Vector4(0.5, 0.5, 0.5, 0.5)
 
+# Title: wobbling gold logo that does a full 360 when clicked
+const TITLE_ANCHORS := Vector4(0.0, 0.33, 1.0, 0.33)   # zero-height; fit_content grows it downward
+const TITLE_GLYPH_SPACING := 5
+const TITLE_OUTLINE_SIZE := 2
+const TITLE_SHADOW_OFFSET := 2
+const TITLE_WAVE_AMP := 40       # BBCode [wave] units
+const TITLE_WAVE_FREQ := 4.0
+const TITLE_SPIN_TIME := 0.9
+# Splashes: right one is a random tagline, left one is fixed; click either and it fades away until next visit
+const SPLASH_ANCHORS := Vector4(0.5, 0.0, 0.5, 0.0)
+const SPLASH_OFFSETS := Vector4(130.0, 345.0, 490.0, 380.0)        # tucked under the right end of the title
+const SPLASH_LEFT_OFFSETS := Vector4(-500.0, 230.0, -140.0, 265.0)  # above the left end of the title
+const SPLASH_ROTATION := -PI / 14.0
+const SPLASH_LEFT_TEXT := "it's really fun apparently!"
+const SPLASH_FADE_TIME := 0.4
+const SPLASH_PULSE_FREQ := 9.0   # rad/s
+const SPLASH_PULSE_AMP := 0.08   # fraction of base scale
+
+# Sticker buttons: see-through dark, gold on hover. Kept straight: tilted edges stair-step
+const STICKER_BORDER := 2
+
+# Settings ("KNOBS")
+const SAVE_PATH := "user://scores.cfg"
+const SETTINGS_SECTION := "settings"
+const BUS_MUSIC := &"Music"
+const BUS_SFX := &"SFX"
+const KEY_FULLSCREEN := "fullscreen"
+const VOLUME_STEP := 0.05
+const SETTINGS_LIST_ANCHORS := Vector4(0.25, 0.30, 0.75, 0.70)
+const SETTINGS_LIST_SEPARATION := 28
+const SETTINGS_LABEL_WIDTH := 190.0
+const SLIDER_THICKNESS := 18.0
+
 # Swatches
 const SWATCH_SIZE := Vector2(52.0, 52.0)
 const SWATCH_SEPARATION := 10
@@ -173,7 +251,10 @@ var _trick_label: Label
 var _trick_label_timer: float = 0.0
 var _fun_had_label: Label
 var _player: Node
+var _level_sign: PanelContainer
 var _level_label: Label
+var _level_number_label: Label
+var _run_symbols: HBoxContainer
 var _skip_btn: Button
 var _now_playing_label: Label
 var _wife_label: Label
@@ -204,6 +285,12 @@ var _afternoon_timer: float = 0.0
 var _close_call_label: Label
 var _close_call_timer: float = 0.0
 var _close_call_wobble_time: float = 0.0
+var _title: RichTextLabel
+var _title_tween: Tween
+var _splash_label: Label
+var _splash_left: Label
+var _splash_time: float = 0.0
+var _settings: Dictionary = {BUS_MUSIC: 1.0, BUS_SFX: 1.0, KEY_FULLSCREEN: false}  # written to SAVE_PATH on leaving KNOBS
 
 @export var fun_rate_wow_threshold: float = 20.0
 @export var wow_display_time: float = 3.0
@@ -216,10 +303,7 @@ var _close_call_wobble_time: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_level_label = _make_label("", FONT_SIZE_LEVEL, true)
-	_level_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_level_label.position = LEVEL_POSITION
-	add_child(_level_label)
+	_build_level_sign()
 
 	_combo_label = _make_label("", FONT_SIZE_COMBO, true)
 	_combo_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -279,6 +363,7 @@ func _ready() -> void:
 	add_child(_woohoo_label)
 
 	_wife_audio = AudioStreamPlayer.new()
+	_wife_audio.bus = BUS_SFX
 	add_child(_wife_audio)
 	_wife_audio.finished.connect(_end_wife_clip)
 	# load() not preload(): a clip that hasn't been imported yet is skipped instead of breaking the HUD
@@ -346,6 +431,11 @@ func _ready() -> void:
 	_death_overlay.color = SCREEN_OVERLAY_COLOR
 	_build_controls_screen()
 	_build_customize_screen()
+	_load_settings()
+	_build_settings_screen()
+	_build_title()
+	for screen in [menu_screen, _game_mode_screen, _controls_screen, _settings_screen, _customize_screen, death_screen, _pause_screen]:
+		_stickerize_buttons(screen)
 	AppearanceManager.unlock_changed.connect(_on_tutorial_board_unlocked)
 	call_deferred("_connect_level_generator")
 	_on_state_changed(GameManager.state)
@@ -414,6 +504,289 @@ func _wobble(label: Label, base_offsets: Vector4, time: float, freq: Vector2, am
 	label.offset_bottom = base_offsets.w + wy
 
 
+func _make_sign_font() -> SystemFont:
+	var font := _make_system_font(SIGN_FONT_NAMES)
+	font.font_weight = SIGN_FONT_WEIGHT
+	font.font_stretch = SIGN_FONT_STRETCH
+	return font
+
+
+func _make_sign_box(face: Color) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = face
+	box.border_color = COLOR_INK
+	box.set_border_width_all(SIGN_BORDER)
+	box.set_corner_radius_all(SIGN_CORNER_RADIUS)
+	box.content_margin_left = SIGN_PADDING.x
+	box.content_margin_right = SIGN_PADDING.x
+	box.content_margin_top = SIGN_PADDING.y
+	box.content_margin_bottom = SIGN_PADDING.y
+	return box
+
+
+## Trail sign: [difficulty symbols] RUN NAME  lvl N
+func _build_level_sign() -> void:
+	_level_sign = PanelContainer.new()
+	_level_sign.position = LEVEL_POSITION
+	_level_sign.visible = false
+	_level_sign.add_theme_stylebox_override("panel", _make_sign_box(COLOR_SIGN_FACE))
+	add_child(_level_sign)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", SIGN_SEPARATION)
+	_level_sign.add_child(row)
+
+	_run_symbols = HBoxContainer.new()
+	_run_symbols.add_theme_constant_override("separation", SIGN_SYMBOL_GAP)
+	_run_symbols.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(_run_symbols)
+
+	var font := _make_sign_font()
+	_level_label = _make_label("", FONT_SIZE_LEVEL)
+	_level_label.add_theme_font_override("font", font)
+	_level_label.add_theme_color_override("font_color", COLOR_INK)
+	row.add_child(_level_label)
+
+	_level_number_label = _make_label("", FONT_SIZE_LEVEL_NUMBER)
+	_level_number_label.add_theme_font_override("font", font)
+	_level_number_label.add_theme_color_override("font_color", Color(COLOR_INK, 0.6))
+	_level_number_label.size_flags_vertical = Control.SIZE_SHRINK_END
+	row.add_child(_level_number_label)
+
+
+func _run_for_level(level_number: int) -> Run:
+	var run := Run.GREEN
+	for i in RUN_THRESHOLDS.size():
+		if level_number >= RUN_THRESHOLDS[i]:
+			run = i as Run
+	if GameManager.is_tutorial:
+		run = mini(run, TUTORIAL_MAX_RUN) as Run
+	return run
+
+
+func _set_run_symbols(run: Run) -> void:
+	for child in _run_symbols.get_children():
+		child.queue_free()
+	match run:
+		Run.GREEN: _add_run_symbol(COLOR_RUN_GREEN, true, false)
+		Run.BLUE: _add_run_symbol(COLOR_RUN_BLUE, false, false)
+		Run.BLACK: _add_run_symbol(COLOR_INK, false, true)
+		Run.DOUBLE_BLACK:
+			_add_run_symbol(COLOR_INK, false, true)
+			_add_run_symbol(COLOR_INK, false, true)
+
+
+## Circle, square, or diamond (a square turned 45 degrees inside a fixed-size slot).
+func _add_run_symbol(color: Color, circle: bool, diamond: bool) -> void:
+	var slot := Control.new()
+	slot.custom_minimum_size = Vector2.ONE * SIGN_SYMBOL_SIZE
+	slot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var shape := Panel.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	if circle:
+		box.set_corner_radius_all(int(SIGN_SYMBOL_SIZE))
+	shape.add_theme_stylebox_override("panel", box)
+	shape.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var side := SIGN_SYMBOL_SIZE * (sqrt(0.5) if diamond else 1.0)  # diamond's corners stay inside the slot
+	shape.size = Vector2.ONE * side
+	shape.position = (slot.custom_minimum_size - shape.size) * 0.5
+	shape.pivot_offset = shape.size * 0.5
+	if diamond:
+		shape.rotation = PI * 0.25
+	slot.add_child(shape)
+	_run_symbols.add_child(slot)
+
+
+func _build_title() -> void:
+	_title = RichTextLabel.new()
+	_layout(_title, TITLE_ANCHORS)
+	_title.bbcode_enabled = true
+	_title.fit_content = true
+	_title.scroll_active = false
+	_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_title.text = "[center][wave amp=%d freq=%.1f]JERRY360[/wave][/center]" % [TITLE_WAVE_AMP, TITLE_WAVE_FREQ]
+	var font := FontVariation.new()
+	font.spacing_glyph = TITLE_GLYPH_SPACING
+	_title.add_theme_font_override("normal_font", font)
+	_title.add_theme_font_size_override("normal_font_size", FONT_SIZE_TITLE)
+	_title.add_theme_color_override("default_color", COLOR_GOLD)
+	_title.add_theme_color_override("font_outline_color", COLOR_TITLE_OUTLINE)
+	_title.add_theme_constant_override("outline_size", TITLE_OUTLINE_SIZE)
+	_title.add_theme_color_override("font_shadow_color", COLOR_TITLE_SHADOW)
+	_title.add_theme_constant_override("shadow_offset_x", TITLE_SHADOW_OFFSET)
+	_title.add_theme_constant_override("shadow_offset_y", TITLE_SHADOW_OFFSET)
+	_title.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR  # project default is nearest; it shreds rotated glyphs
+	_title.gui_input.connect(_on_title_gui_input)
+	menu_screen.add_child(_title)
+
+	_splash_label = _add_splash("", SPLASH_OFFSETS, SPLASH_ROTATION)
+	_splash_left = _add_splash(SPLASH_LEFT_TEXT, SPLASH_LEFT_OFFSETS, -SPLASH_ROTATION)
+
+
+func _add_splash(text: String, offsets: Vector4, angle: float) -> Label:
+	var splash := _make_label(text, FONT_SIZE_SPLASH)
+	_layout(splash, SPLASH_ANCHORS, offsets)
+	splash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	splash.rotation = angle
+	splash.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	splash.mouse_filter = Control.MOUSE_FILTER_STOP
+	splash.add_theme_color_override("font_color", COLOR_SPLASH)
+	splash.add_theme_color_override("font_outline_color", COLOR_INK)
+	splash.add_theme_constant_override("outline_size", STICKER_BORDER)
+	splash.gui_input.connect(_on_splash_gui_input.bind(splash))
+	menu_screen.add_child(splash)
+	return splash
+
+
+func _on_splash_gui_input(event: InputEvent, splash: Label) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		splash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var tw := splash.create_tween()
+		tw.tween_property(splash, "modulate:a", 0.0, SPLASH_FADE_TIME)
+		tw.tween_callback(splash.hide)
+
+
+## Back on the menu: both splashes return, right one with a fresh tagline.
+func _reset_splashes() -> void:
+	_splash_label.text = MENU_TAGLINES.pick_random()
+	for splash: Label in [_splash_label, _splash_left]:
+		splash.show()
+		splash.modulate.a = 1.0
+		splash.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
+## Does the 360 (click only). Pivot is set here because the title's size is only known after layout.
+func _spin_title() -> void:
+	if _title_tween and _title_tween.is_running():
+		return
+	_title.pivot_offset = _title.size * 0.5
+	_title_tween = create_tween()
+	_title_tween.tween_property(_title, "rotation", TAU, TITLE_SPIN_TIME).from(0.0) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+
+
+func _on_title_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_spin_title()
+
+
+## Every Button directly under a screen becomes a slightly crooked see-through sticker.
+func _stickerize_buttons(screen: Control) -> void:
+	for child in screen.get_children():
+		if child is Button:
+			_stickerize(child)
+
+
+func _stickerize(btn: Button) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = COLOR_STICKER_FILL
+	normal.border_color = COLOR_STICKER_EDGE
+	normal.set_border_width_all(STICKER_BORDER)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = COLOR_STICKER_FILL_HOVER
+	hover.border_color = COLOR_GOLD
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = COLOR_GOLD
+	pressed.border_color = COLOR_GOLD
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("hover_pressed", pressed)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	btn.add_theme_color_override("font_color", COLOR_STICKER_TEXT)
+	btn.add_theme_color_override("font_focus_color", COLOR_STICKER_TEXT)
+	btn.add_theme_color_override("font_hover_color", COLOR_GOLD)
+	btn.add_theme_color_override("font_pressed_color", COLOR_INK)
+	btn.add_theme_color_override("font_hover_pressed_color", COLOR_INK)
+	btn.add_theme_font_size_override("font_size", FONT_SIZE_STICKER)
+
+
+func _build_settings_screen() -> void:
+	_add_overlay(_settings_screen)
+
+	var title := _add_screen_label(_settings_screen, "KNOBS", FONT_SIZE_CONTROLS_TITLE, CONTROLS_TITLE_ANCHORS)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", COLOR_GOLD)
+
+	var list := VBoxContainer.new()
+	_layout(list, SETTINGS_LIST_ANCHORS)
+	list.add_theme_constant_override("separation", SETTINGS_LIST_SEPARATION)
+	_settings_screen.add_child(list)
+	_add_volume_row(list, "tunes", BUS_MUSIC, COLOR_GOLD)
+	_add_volume_row(list, "crunchy noises", BUS_SFX, COLOR_ORANGE)
+
+	var big := CheckButton.new()
+	big.text = "big screen mode"
+	big.add_theme_font_size_override("font_size", FONT_SIZE_SETTINGS_ROW)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		big.add_theme_color_override(state, COLOR_GOLD)
+	big.button_pressed = _settings[KEY_FULLSCREEN]
+	big.toggled.connect(_set_fullscreen)
+	list.add_child(big)
+
+	_add_back_button(_settings_screen, CONTROLS_BACK_ANCHORS, _on_settings_back_pressed)
+
+
+func _add_volume_row(list: VBoxContainer, label_text: String, bus: StringName, fill: Color) -> void:
+	var row := HBoxContainer.new()
+	var label := _make_label(label_text, FONT_SIZE_SETTINGS_ROW)
+	label.custom_minimum_size.x = SETTINGS_LABEL_WIDTH
+	label.add_theme_color_override("font_color", COLOR_GOLD)
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.max_value = 1.0
+	slider.step = VOLUME_STEP
+	slider.value = _settings[bus]
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Fat inked groove, filled with sticker color up to the grabber
+	var groove := StyleBoxFlat.new()
+	groove.bg_color = COLOR_INK
+	groove.content_margin_top = SLIDER_THICKNESS * 0.5
+	groove.content_margin_bottom = SLIDER_THICKNESS * 0.5
+	var filled := StyleBoxFlat.new()
+	filled.bg_color = fill
+	filled.set_border_width_all(STICKER_BORDER)
+	filled.border_color = COLOR_INK
+	slider.add_theme_stylebox_override("slider", groove)
+	slider.add_theme_stylebox_override("grabber_area", filled)
+	slider.add_theme_stylebox_override("grabber_area_highlight", filled)
+	slider.value_changed.connect(_set_bus_volume.bind(bus))
+	row.add_child(slider)
+	list.add_child(row)
+
+
+func _load_settings() -> void:
+	var config := ConfigFile.new()
+	config.load(SAVE_PATH)  # missing file -> defaults in _settings
+	for key in _settings:
+		_settings[key] = config.get_value(SETTINGS_SECTION, key, _settings[key])
+	_set_bus_volume(_settings[BUS_MUSIC], BUS_MUSIC)
+	_set_bus_volume(_settings[BUS_SFX], BUS_SFX)
+	_set_fullscreen(_settings[KEY_FULLSCREEN])
+
+
+func _save_settings() -> void:
+	var config := ConfigFile.new()
+	config.load(SAVE_PATH)  # keep scores + lodge picks that share the file
+	for key in _settings:
+		config.set_value(SETTINGS_SECTION, key, _settings[key])
+	config.save(SAVE_PATH)
+
+
+func _set_bus_volume(linear: float, bus: StringName) -> void:
+	_settings[bus] = linear
+	var idx := AudioServer.get_bus_index(bus)
+	AudioServer.set_bus_volume_db(idx, linear_to_db(linear))
+	AudioServer.set_bus_mute(idx, linear <= 0.0)
+
+
+func _set_fullscreen(on: bool) -> void:
+	_settings[KEY_FULLSCREEN] = on
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
 func _build_controls_screen() -> void:
 	_add_overlay(_controls_screen)
 
@@ -454,6 +827,13 @@ func _connect_level_generator() -> void:
 
 
 func _process(delta: float) -> void:
+	if menu_screen.visible:
+		_splash_time += delta
+		var pulse := Vector2.ONE * (1.0 + sin(_splash_time * SPLASH_PULSE_FREQ) * SPLASH_PULSE_AMP)
+		for splash: Label in [_splash_label, _splash_left]:
+			splash.pivot_offset = splash.size * 0.5
+			splash.scale = pulse
+
 	if _goofy_label.visible:
 		_goofy_time += delta
 		_wobble(_goofy_label, GOOFY_OFFSETS, _goofy_time, GOOFY_WOBBLE_FREQ, GOOFY_WOBBLE_AMP)
@@ -560,10 +940,11 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 	_game_mode_screen.visible = false
 	_customize_screen.visible = false
 	_controls_screen.visible = false
+	_settings_screen.visible = false
 	_pause_screen.visible = new_state == GameManager.State.PAUSED
 	death_screen.visible = new_state == GameManager.State.DEAD
 	distance_label.visible = new_state == GameManager.State.PLAYING
-	_level_label.visible = new_state == GameManager.State.PLAYING
+	_level_sign.visible = new_state == GameManager.State.PLAYING
 	_skip_btn.visible = new_state == GameManager.State.PLAYING
 	_now_playing_label.visible = new_state == GameManager.State.PLAYING
 	_fun_had_label.visible = new_state == GameManager.State.PLAYING
@@ -584,6 +965,9 @@ func _on_state_changed(new_state: GameManager.State) -> void:
 		_tutorial_instructions.clear()
 		_afternoon_label.visible = false
 		_afternoon_timer = 0.0
+
+	if new_state == GameManager.State.MENU:
+		_reset_splashes()
 
 	if new_state == GameManager.State.DEAD:
 		var dist := ScoreManager.distance
@@ -809,6 +1193,17 @@ func _on_controls_back_pressed() -> void:
 	menu_screen.visible = true
 
 
+func _on_settings_pressed() -> void:
+	menu_screen.visible = false
+	_settings_screen.visible = true
+
+
+func _on_settings_back_pressed() -> void:
+	_save_settings()
+	_settings_screen.visible = false
+	menu_screen.visible = true
+
+
 func _on_punch_pass_pressed() -> void:
 	menu_screen.visible = false
 	_game_mode_screen.visible = true
@@ -824,8 +1219,10 @@ func _on_start_pressed() -> void:
 
 
 func _on_level_changed(level_name: String, level_number: int) -> void:
-	_level_label.text = "LEVEL %d: %s" % [level_number, level_name]
-	_level_label.visible = GameManager.state == GameManager.State.PLAYING
+	_level_label.text = level_name
+	_level_number_label.text = "lvl %d" % level_number
+	_set_run_symbols(_run_for_level(level_number))
+	_level_sign.visible = GameManager.state == GameManager.State.PLAYING
 
 
 func _on_game_started() -> void:
